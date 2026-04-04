@@ -574,7 +574,7 @@ def high_stock_alerts():
 @login_required
 def settings():
     """系统设置"""
-    if session.get('username') != 'admin':
+    if session.get('role') != 'admin':
         return '无权限', 403
     
     # 获取当前设置
@@ -591,7 +591,7 @@ def settings():
 @login_required
 def upload_logo():
     """上传系统Logo"""
-    if session.get('username') != 'admin':
+    if session.get('role') != 'admin':
         return jsonify({'success': False, 'message': '无权限'})
     
     if 'logo' not in request.files:
@@ -614,7 +614,7 @@ def upload_logo():
 @login_required
 def upload_background():
     """上传登录页背景"""
-    if session.get('username') != 'admin':
+    if session.get('role') != 'admin':
         return jsonify({'success': False, 'message': '无权限'})
     
     if 'background' not in request.files:
@@ -637,7 +637,7 @@ def upload_background():
 @login_required
 def update_settings():
     """更新系统设置"""
-    if session.get('username') != 'admin':
+    if session.get('role') != 'admin':
         return jsonify({'success': False, 'message': '无权限'})
     
     system_name = request.form.get('system_name', '')
@@ -652,7 +652,7 @@ def update_settings():
 @login_required
 def reset_logo():
     """删除Logo"""
-    if session.get('username') != 'admin':
+    if session.get('role') != 'admin':
         return jsonify({'success': False, 'message': '无权限'})
     SystemSettings.set('system_logo', '')
     return jsonify({'success': True, 'message': 'Logo已删除'})
@@ -661,7 +661,7 @@ def reset_logo():
 @login_required
 def reset_background():
     """删除登录背景"""
-    if session.get('username') != 'admin':
+    if session.get('role') != 'admin':
         return jsonify({'success': False, 'message': '无权限'})
     SystemSettings.set('login_background', '')
     return jsonify({'success': True, 'message': '背景已删除'})
@@ -726,7 +726,7 @@ PERMISSION_GROUPS = {
 @login_required
 def permissions():
     """权限管理"""
-    if session.get('username') != 'admin':
+    if session.get('role') != 'admin':
         return '无权限', 403
     
     # 获取当前权限配置
@@ -746,7 +746,7 @@ def permissions():
 @login_required
 def save_permissions():
     """保存权限配置"""
-    if session.get('username') != 'admin':
+    if session.get('role') != 'admin':
         return jsonify({'success': False, 'message': '无权限'})
     
     import json
@@ -763,7 +763,7 @@ def save_permissions():
 @login_required
 def reset_permissions():
     """重置权限为默认"""
-    if session.get('username') != 'admin':
+    if session.get('role') != 'admin':
         return jsonify({'success': False, 'message': '无权限'})
     
     import json
@@ -776,7 +776,7 @@ def reset_permissions():
 @login_required
 def users():
     """用户列表（仅管理员）"""
-    if session.get('username') != 'admin':
+    if session.get('role') != 'admin':
         return '无权限', 403
     users_list = User.query.all()
     return render_template('users.html', users=users_list)
@@ -810,7 +810,7 @@ def change_password():
 @login_required
 def update_user_role(user_id):
     """更新用户角色（仅管理员）"""
-    if session.get('username') != 'admin':
+    if session.get('role') != 'admin':
         return jsonify({'success': False, 'message': '无权限'})
     
     user = User.query.get_or_404(user_id)
@@ -824,7 +824,7 @@ def update_user_role(user_id):
 @login_required
 def add_user():
     """添加用户"""
-    if session.get('username') != 'admin':
+    if session.get('role') != 'admin':
         return '无权限', 403
     username = request.form.get('username')
     password = request.form.get('password')
@@ -842,7 +842,7 @@ def add_user():
 @login_required
 def edit_user(user_id):
     """编辑用户"""
-    if session.get('username') != 'admin':
+    if session.get('role') != 'admin':
         return '无权限', 403
     
     user = User.query.get_or_404(user_id)
@@ -864,7 +864,7 @@ def edit_user(user_id):
 @login_required
 def reset_user_password(user_id):
     """重置用户密码（仅管理员）"""
-    if session.get('username') != 'admin':
+    if session.get('role') != 'admin':
         return '无权限', 403
     
     user = User.query.get_or_404(user_id)
@@ -884,7 +884,7 @@ def reset_user_password(user_id):
 @login_required
 def delete_user(user_id):
     """删除用户"""
-    if session.get('username') != 'admin':
+    if session.get('role') != 'admin':
         return '无权限', 403
     
     user = User.query.get_or_404(user_id)
