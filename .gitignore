@@ -16,6 +16,10 @@ env/
 # Database (sensitive data)
 instance/*.db
 
+# Uploaded images
+static/uploads/*
+!static/uploads/.gitkeep
+
 # Logs
 *.log
 logs/

@@ -13,11 +13,27 @@ import io
 import base64
 from datetime import datetime, timedelta
 import os
+from werkzeug.utils import secure_filename
+
+UPLOAD_FOLDER = 'static/uploads'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///inventory.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def upload_image(file):
+    if file and allowed_file(file.filename):
+        ext = file.filename.rsplit('.', 1)[1].lower()
+        filename = f"{uuid.uuid4().hex}.{ext}"
+        file.save(os.path.join(UPLOAD_FOLDER, filename))
+        return filename
+    return None
 
 db = SQLAlchemy(app)
 
@@ -46,6 +62,7 @@ class Product(db.Model):
     min_stock = db.Column(db.Integer, default=0)  # 最低库存预警
     current_stock = db.Column(db.Integer, default=0)
     location = db.Column(db.String(100))  # 存放位置
+    image_url = db.Column(db.String(500))  # 商品图片路径
     remark = db.Column(db.Text)  # 备注
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -207,6 +224,12 @@ def add_product():
         location = request.form.get('location', '')
         remark = request.form.get('remark', '')
         
+        # 处理图片上传
+        image_url = None
+        if 'image' in request.files:
+            file = request.files['image']
+            image_url = upload_image(file)
+        
         product = Product(
             code=generate_code(),
             name=name,
@@ -214,6 +237,7 @@ def add_product():
             unit=unit,
             min_stock=min_stock,
             location=location,
+            image_url=image_url,
             remark=remark
         )
         db.session.add(product)
@@ -236,6 +260,15 @@ def edit_product(product_id):
         product.min_stock = request.form.get('min_stock', type=int, default=0)
         product.location = request.form.get('location', '')
         product.remark = request.form.get('remark', '')
+        
+        # 处理图片上传（可选）
+        if 'image' in request.files:
+            file = request.files['image']
+            if file and file.filename:
+                new_image = upload_image(file)
+                if new_image:
+                    product.image_url = new_image
+        
         db.session.commit()
         return redirect(url_for('products'))
     

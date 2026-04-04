@@ -9,6 +9,8 @@ services:
     volumes:
       # 持久化数据库
       - ./instance:/app/instance
+      # 持久化上传的图片
+      - ./static/uploads:/app/static/uploads
     restart: unless-stopped
     environment:
       - FLASK_ENV=production

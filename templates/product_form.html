@@ -17,41 +17,69 @@
                 <h5 class="mb-0"><i class="bi bi-{{ 'pencil' if product else 'plus-circle' }}"></i> {{ '编辑商品' if product else '添加商品' }}</h5>
             </div>
             <div class="card-body">
-                <form method="POST">
+                <form method="POST" enctype="multipart/form-data">
                     <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label">商品名称 *</label>
-                            <input type="text" name="name" class="form-control" value="{{ product.name if product else '' }}" required>
+                        <!-- 左侧：图片 -->
+                        <div class="col-md-4 text-center">
+                            {% if product and product.image_url %}
+                            <img src="{{ url_for('static', filename='uploads/' + product.image_url) }}" 
+                                 alt="商品图片" class="img-thumbnail mb-2" style="max-height: 200px;">
+                            <div class="mb-2">
+                                <small class="text-muted">当前图片</small>
+                            </div>
+                            {% else %}
+                            <div class="bg-light d-flex align-items-center justify-content-center" 
+                                 style="height: 150px; border-radius: 8px;">
+                                <i class="bi bi-image text-muted" style="font-size: 3rem;"></i>
+                            </div>
+                            <small class="text-muted">暂无图片</small>
+                            {% endif %}
+                            
+                            <div class="mb-3">
+                                <label class="form-label">{{ '更换图片' if product and product.image_url else '添加图片' }}</label>
+                                <input type="file" name="image" class="form-control" accept="image/*">
+                                <small class="text-muted">支持 JPG、PNG、GIF、WebP</small>
+                            </div>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">分类</label>
-                            <select name="category_id" class="form-select">
-                                <option value="">请选择</option>
-                                {% for cat in categories %}
-                                <option value="{{ cat.id }}" {% if product and product.category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
-                                {% endfor %}
-                            </select>
+                        
+                        <!-- 右侧：表单 -->
+                        <div class="col-md-8">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">商品名称 *</label>
+                                    <input type="text" name="name" class="form-control" value="{{ product.name if product else '' }}" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">分类</label>
+                                    <select name="category_id" class="form-select">
+                                        <option value="">请选择</option>
+                                        {% for cat in categories %}
+                                        <option value="{{ cat.id }}" {% if product and product.category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">单位</label>
+                                    <input type="text" name="unit" class="form-control" value="{{ product.unit if product else '件' }}">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">最低库存预警</label>
+                                    <input type="number" name="min_stock" class="form-control" value="{{ product.min_stock if product else 0 }}" min="0">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">存放位置</label>
+                                    <input type="text" name="location" class="form-control" value="{{ product.location if product else '' }}">
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">备注</label>
+                                <textarea name="remark" class="form-control" rows="3">{{ product.remark if product else '' }}</textarea>
+                            </div>
                         </div>
-                    </div>
-                    
-                    <div class="row mb-3">
-                        <div class="col-md-4">
-                            <label class="form-label">单位</label>
-                            <input type="text" name="unit" class="form-control" value="{{ product.unit if product else '件' }}">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">最低库存预警</label>
-                            <input type="number" name="min_stock" class="form-control" value="{{ product.min_stock if product else 0 }}" min="0">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">存放位置</label>
-                            <input type="text" name="location" class="form-control" value="{{ product.location if product else '' }}">
-                        </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">备注</label>
-                        <textarea name="remark" class="form-control" rows="3">{{ product.remark if product else '' }}</textarea>
                     </div>
                     
                     <div class="d-flex gap-2">

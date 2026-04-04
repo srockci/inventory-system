@@ -41,6 +41,7 @@
             <table class="table table-hover">
                 <thead>
                     <tr>
+                        <th>图片</th>
                         <th>编码</th>
                         <th>名称</th>
                         <th>分类</th>
@@ -54,6 +55,17 @@
                 <tbody>
                     {% for p in products %}
                     <tr class="{% if p.min_stock > 0 and p.current_stock <= p.min_stock %}table-danger{% endif %}">
+                        <td>
+                            {% if p.image_url %}
+                            <img src="{{ url_for('static', filename='uploads/' + p.image_url) }}" 
+                                 alt="{{ p.name }}" class="rounded" style="width: 50px; height: 50px; object-fit: cover;">
+                            {% else %}
+                            <div class="bg-light d-flex align-items-center justify-content-center rounded" 
+                                 style="width: 50px; height: 50px;">
+                                <i class="bi bi-image text-muted"></i>
+                            </div>
+                            {% endif %}
+                        </td>
                         <td><code>{{ p.code }}</code></td>
                         <td>{{ p.name }}</td>
                         <td>{{ p.category.name if p.category else '-' }}</td>
@@ -81,7 +93,7 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="8" class="text-center text-muted py-4">
+                        <td colspan="9" class="text-center text-muted py-4">
                             <i class="bi bi-inbox" style="font-size: 2rem;"></i>
                             <p class="mb-0">暂无商品</p>
                         </td>
