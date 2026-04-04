@@ -894,7 +894,7 @@ def delete_user(user_id):
         return jsonify({'success': False, 'message': '不能删除自己'})
     
     # 不允许删除最后一个管理员
-    if user.username == 'admin' and User.query.filter_by(username='admin').count() <= 1:
+    if user.role == 'admin' and User.query.filter_by(role='admin').count() <= 1:
         return jsonify({'success': False, 'message': '不能删除最后一个管理员'})
     
     db.session.delete(user)
