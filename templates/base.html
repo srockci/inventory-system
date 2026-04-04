@@ -107,9 +107,30 @@
             padding: 10px 15px;
             z-index: 1060;
             display: flex;
-            gap: 8px;
             align-items: center;
             background: #f5f6fa;
+        }
+        
+        .toolbar-left {
+            flex: 1;
+            display: flex;
+            align-items: center;
+        }
+        
+        .toolbar-center {
+            flex: 2;
+            text-align: center;
+        }
+        
+        .toolbar-center .system-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        
+        .toolbar-right {
+            flex: 1;
+            display: flex;
+            justify-content: flex-end;
         }
         
         @media (max-width: 768px) {
@@ -120,6 +141,14 @@
         
         body.dark-mode .top-toolbar {
             background: #1a1a2e;
+        }
+        
+        body.dark-mode .toolbar-center .system-title {
+            color: #e0e0e0;
+        }
+        
+        body.dark-mode .toolbar-left img {
+            filter: brightness(1.2);
         }
         
         /* 夜间模式 */
@@ -375,45 +404,58 @@
         {% endif %}
     </nav>
     
-    <!-- 右上角工具栏（悬浮在最上层） -->
+    <!-- 顶部悬浮工具栏 -->
     <div class="top-toolbar">
-        <div class="d-flex gap-2 align-items-center">
-            <!-- 日夜切换 -->
-            <div class="dropdown">
-                <button class="btn btn-link text-muted p-1" data-bs-toggle="dropdown" title="切换主题" id="theme-btn">
-                    <i class="bi bi-circle-half" id="theme-icon" style="font-size: 1.3rem;"></i>
-                </button>
-                <ul class="dropdown-menu dropdown-menu-end">
-                    <li><a class="dropdown-item" href="#" onclick="setTheme('light'); return false;">
-                        <i class="bi bi-sun me-2"></i>日间模式
-                    </a></li>
-                    <li><a class="dropdown-item" href="#" onclick="setTheme('dark'); return false;">
-                        <i class="bi bi-moon me-2"></i>夜间模式
-                    </a></li>
-                    <li><a class="dropdown-item" href="#" onclick="setTheme('system'); return false;">
-                        <i class="bi bi-circle-half me-2"></i>跟随系统
-                    </a></li>
-                </ul>
-            </div>
-            <!-- 用户菜单 -->
-            <div class="dropdown">
-                <button class="btn btn-link text-muted p-1" data-bs-toggle="dropdown" title="菜单">
-                    <i class="bi bi-person-circle" style="font-size: 1.3rem;"></i>
-                </button>
-                <ul class="dropdown-menu dropdown-menu-end">
-                    <li><span class="dropdown-item-text text-muted"><small>{{ session.username }}</small></span></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="{{ url_for('change_password') }}">
-                        <i class="bi bi-key me-2"></i>修改密码
-                    </a></li>
-                    <li><a class="dropdown-item" href="{{ url_for('settings') }}">
-                        <i class="bi bi-gear me-2"></i>系统设置
-                    </a></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="{{ url_for('logout') }}">
-                        <i class="bi bi-box-arrow-right me-2"></i>退出登录
-                    </a></li>
-                </ul>
+        <!-- 左侧：Logo -->
+        <div class="toolbar-left">
+            {% if g.system_logo %}
+            <img src="{{ url_for('static', filename='uploads/' + g.system_logo) }}" alt="logo" style="height: 24px; margin-right: 8px;">
+            {% endif %}
+        </div>
+        <!-- 中间：系统名称 -->
+        <div class="toolbar-center">
+            <span class="system-title">{{ g.system_name }}</span>
+        </div>
+        <!-- 右侧：图标 -->
+        <div class="toolbar-right">
+            <div class="d-flex gap-2 align-items-center">
+                <!-- 日夜切换 -->
+                <div class="dropdown">
+                    <button class="btn btn-link text-muted p-1" data-bs-toggle="dropdown" title="切换主题" id="theme-btn">
+                        <i class="bi bi-circle-half" id="theme-icon" style="font-size: 1.3rem;"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="#" onclick="setTheme('light'); return false;">
+                            <i class="bi bi-sun me-2"></i>日间模式
+                        </a></li>
+                        <li><a class="dropdown-item" href="#" onclick="setTheme('dark'); return false;">
+                            <i class="bi bi-moon me-2"></i>夜间模式
+                        </a></li>
+                        <li><a class="dropdown-item" href="#" onclick="setTheme('system'); return false;">
+                            <i class="bi bi-circle-half me-2"></i>跟随系统
+                        </a></li>
+                    </ul>
+                </div>
+                <!-- 用户菜单 -->
+                <div class="dropdown">
+                    <button class="btn btn-link text-muted p-1" data-bs-toggle="dropdown" title="菜单">
+                        <i class="bi bi-person-circle" style="font-size: 1.3rem;"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><span class="dropdown-item-text text-muted"><small>{{ session.username }}</small></span></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{{ url_for('change_password') }}">
+                            <i class="bi bi-key me-2"></i>修改密码
+                        </a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('settings') }}">
+                            <i class="bi bi-gear me-2"></i>系统设置
+                        </a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{{ url_for('logout') }}">
+                            <i class="bi bi-box-arrow-right me-2"></i>退出登录
+                        </a></li>
+                    </ul>
+                </div>
             </div>
         </div>
     </div>
