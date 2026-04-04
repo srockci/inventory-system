@@ -38,6 +38,13 @@
             align-items: center;
             justify-content: space-between;
         }
+        .sidebar-header a {
+            color: white;
+            text-decoration: none;
+        }
+        .sidebar-header a:hover {
+            opacity: 0.8;
+        }
         .sidebar a {
             color: rgba(255,255,255,0.8);
             text-decoration: none;
@@ -80,6 +87,10 @@
             left: 0;
             right: 0;
             z-index: 1040;
+        }
+        .mobile-header a {
+            color: white;
+            text-decoration: none;
         }
         .card {
             border: none;
@@ -176,12 +187,14 @@
         <button class="btn btn-link text-white p-0" id="menu-toggle">
             <i class="bi bi-list" style="font-size: 1.5rem;"></i>
         </button>
-        <span class="h5 mb-0">
+        <a href="{{ url_for('index') }}">
+            <span class="h5 mb-0">
                 {% if g.system_logo %}
                 <img src="{{ url_for('static', filename='uploads/' + g.system_logo) }}" alt="logo" style="height: 24px; margin-right: 8px;">
                 {% endif %}
                 {{ g.system_name }}
             </span>
+        </a>
         <span></span>
     </div>
     
@@ -191,14 +204,16 @@
     <!-- 侧边栏 -->
     <nav class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            <h5 class="mb-0">
-                {% if g.system_logo %}
-                <img src="{{ url_for('static', filename='uploads/' + g.system_logo) }}" alt="logo" style="height: 24px; margin-right: 8px;">
-                {% else %}
-                <i class="bi bi-box-seam"></i>
-                {% endif %}
-                {{ g.system_name }}
-            </h5>
+            <a href="{{ url_for('index') }}">
+                <h5 class="mb-0">
+                    {% if g.system_logo %}
+                    <img src="{{ url_for('static', filename='uploads/' + g.system_logo) }}" alt="logo" style="height: 24px; margin-right: 8px;">
+                    {% else %}
+                    <i class="bi bi-box-seam"></i>
+                    {% endif %}
+                    {{ g.system_name }}
+                </h5>
+            </a>
             <button class="btn btn-link text-white p-0 d-md-none" id="menu-close">
                 <i class="bi bi-x-lg"></i>
             </button>

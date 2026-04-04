@@ -1,95 +1,106 @@
 {% extends "base.html" %}
 
-{% block title %}仪表盘{% endblock %}
+{% block title %}{{ g.system_name }}{% endblock %}
 
 {% block content %}
 <h4 class="mb-4"><i class="bi bi-speedometer2"></i> 仪表盘</h4>
 
 <!-- 统计卡片 -->
-<div class="row g-4 mb-4">
-    <div class="col-md-3">
-        <div class="stat-card blue">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h3 class="mb-0">{{ total_products }}</h3>
-                    <small>商品总数</small>
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="rounded bg-primary bg-opacity-10 p-3">
+                    <i class="bi bi-box text-primary" style="font-size: 1.5rem;"></i>
                 </div>
-                <i class="bi bi-box" style="font-size: 2.5rem; opacity: 0.5;"></i>
+                <div>
+                    <h4 class="mb-0">{{ total_products }}</h4>
+                    <small class="text-muted">商品总数</small>
+                </div>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="stat-card red">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h3 class="mb-0">{{ low_stock_count }}</h3>
-                    <small>库存预警</small>
+    <div class="col-6 col-md-3">
+        <div class="card h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="rounded bg-danger bg-opacity-10 p-3">
+                    <i class="bi bi-bell text-danger" style="font-size: 1.5rem;"></i>
                 </div>
-                <i class="bi bi-bell" style="font-size: 2.5rem; opacity: 0.5;"></i>
+                <div>
+                    <h4 class="mb-0">{{ low_stock_count }}</h4>
+                    <small class="text-muted">库存预警</small>
+                </div>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="stat-card green">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h3 class="mb-0">{{ stock_in_today }}</h3>
-                    <small>今日入库</small>
+    <div class="col-6 col-md-3">
+        <div class="card h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="rounded bg-success bg-opacity-10 p-3">
+                    <i class="bi bi-arrow-down-circle text-success" style="font-size: 1.5rem;"></i>
                 </div>
-                <i class="bi bi-arrow-down-circle" style="font-size: 2.5rem; opacity: 0.5;"></i>
+                <div>
+                    <h4 class="mb-0">{{ stock_in_today }}</h4>
+                    <small class="text-muted">今日入库</small>
+                </div>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="stat-card orange">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h3 class="mb-0">{{ stock_out_today }}</h3>
-                    <small>今日出库</small>
+    <div class="col-6 col-md-3">
+        <div class="card h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="rounded bg-warning bg-opacity-10 p-3">
+                    <i class="bi bi-arrow-up-circle text-warning" style="font-size: 1.5rem;"></i>
                 </div>
-                <i class="bi bi-arrow-up-circle" style="font-size: 2.5rem; opacity: 0.5;"></i>
+                <div>
+                    <h4 class="mb-0">{{ stock_out_today }}</h4>
+                    <small class="text-muted">今日出库</small>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
 <!-- 快捷操作 -->
-<div class="row g-4">
-    <div class="col-md-4">
-        <div class="card h-100">
-            <div class="card-body text-center">
-                <i class="bi bi-qr-code-scan text-primary" style="font-size: 3rem;"></i>
-                <h5 class="card-title mt-3">扫码入库</h5>
-                <p class="card-text text-muted">使用手机摄像头扫描商品二维码入库</p>
-                <a href="{{ url_for('stock_in_page') }}" class="btn btn-primary">
-                    <i class="bi bi-arrow-down-circle"></i> 开始入库
-                </a>
+<div class="row g-3">
+    <div class="col-6 col-md-4">
+        <a href="{{ url_for('stock_in_page') }}" class="text-decoration-none">
+            <div class="card h-100">
+                <div class="card-body text-center py-4">
+                    <div class="rounded-circle bg-success bg-opacity-10 d-inline-flex p-3 mb-3">
+                        <i class="bi bi-qr-code-scan text-success" style="font-size: 2rem;"></i>
+                    </div>
+                    <h6 class="card-title mb-1">扫码入库</h6>
+                    <small class="text-muted">使用手机摄像头扫描商品二维码入库</small>
+                </div>
             </div>
-        </div>
+        </a>
     </div>
-    <div class="col-md-4">
-        <div class="card h-100">
-            <div class="card-body text-center">
-                <i class="bi bi-upc-scan text-success" style="font-size: 3rem;"></i>
-                <h5 class="card-title mt-3">扫码出库</h5>
-                <p class="card-text text-muted">使用手机摄像头扫描商品二维码出库</p>
-                <a href="{{ url_for('stock_out_page') }}" class="btn btn-success">
-                    <i class="bi bi-arrow-up-circle"></i> 开始出库
-                </a>
+    <div class="col-6 col-md-4">
+        <a href="{{ url_for('stock_out_page') }}" class="text-decoration-none">
+            <div class="card h-100">
+                <div class="card-body text-center py-4">
+                    <div class="rounded-circle bg-danger bg-opacity-10 d-inline-flex p-3 mb-3">
+                        <i class="bi bi-upc-scan text-danger" style="font-size: 2rem;"></i>
+                    </div>
+                    <h6 class="card-title mb-1">扫码出库</h6>
+                    <small class="text-muted">使用手机摄像头扫描商品二维码出库</small>
+                </div>
             </div>
-        </div>
+        </a>
     </div>
-    <div class="col-md-4">
-        <div class="card h-100">
-            <div class="card-body text-center">
-                <i class="bi bi-clipboard-check text-warning" style="font-size: 3rem;"></i>
-                <h5 class="card-title mt-3">扫码盘点</h5>
-                <p class="card-text text-muted">使用手机摄像头扫描商品进行库存盘点</p>
-                <a href="{{ url_for('stock_check_page') }}" class="btn btn-warning">
-                    <i class="bi bi-clipboard-check"></i> 开始盘点
-                </a>
+    <div class="col-6 col-md-4">
+        <a href="{{ url_for('stock_check_page') }}" class="text-decoration-none">
+            <div class="card h-100">
+                <div class="card-body text-center py-4">
+                    <div class="rounded-circle bg-warning bg-opacity-10 d-inline-flex p-3 mb-3">
+                        <i class="bi bi-clipboard-check text-warning" style="font-size: 2rem;"></i>
+                    </div>
+                    <h6 class="card-title mb-1">扫码盘点</h6>
+                    <small class="text-muted">使用手机摄像头扫描商品进行库存盘点</small>
+                </div>
             </div>
-        </div>
+        </a>
     </div>
 </div>
 
@@ -104,21 +115,32 @@
             <table class="table table-hover">
                 <thead>
                     <tr>
-                        <th>商品编码</th>
-                        <th>商品名称</th>
+                        <th>商品</th>
                         <th>当前库存</th>
                         <th>最低库存</th>
-                        <th>操作</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for product in Product.query.filter(Product.current_stock <= Product.min_stock, Product.min_stock > 0).order_by(Product.current_stock).all() %}
+                    {% for product in Product.query.filter(Product.current_stock <= Product.min_stock, Product.min_stock > 0).order_by(Product.current_stock).limit(10).all() %}
                     <tr>
-                        <td><code>{{ product.code }}</code></td>
-                        <td>{{ product.name }}</td>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                {% if product.image_url %}
+                                <img src="{{ url_for('static', filename='uploads/' + product.image_url) }}" 
+                                     alt="" class="rounded" style="width: 40px; height: 40px; object-fit: cover;">
+                                {% else %}
+                                <div class="bg-light rounded d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                                    <i class="bi bi-box text-muted"></i>
+                                </div>
+                                {% endif %}
+                                <div>
+                                    <div>{{ product.name }}</div>
+                                    <small class="text-muted"><code>{{ product.code }}</code></small>
+                                </div>
+                            </div>
+                        </td>
                         <td><span class="badge bg-danger">{{ product.current_stock }} {{ product.unit }}</span></td>
                         <td>{{ product.min_stock }} {{ product.unit }}</td>
-                        <td><a href="{{ url_for('product_qrcode', product_id=product.id) }}" class="btn btn-sm btn-outline-primary">查看二维码</a></td>
                     </tr>
                     {% endfor %}
                 </tbody>
