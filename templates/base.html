@@ -390,7 +390,7 @@
         </a>
         
         <!-- 系统 -->
-        {% if session.username == 'admin' %}
+        {% if session.get('role') == 'admin' %}
         <div class="menu-category">系统</div>
         <a href="{{ url_for('users') }}">
             <i class="bi bi-people"></i> 用户管理

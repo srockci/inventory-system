@@ -208,6 +208,7 @@ def login():
         if user and verify_password(password, user.password_hash):
             session['user_id'] = user.id
             session['username'] = user.username
+            session['role'] = user.role  # 保存角色到session
             return redirect(url_for('index'))
         return render_template('login.html', error='用户名或密码错误')
     return render_template('login.html')
