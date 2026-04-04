@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+
+{% block title %}扫码入库{% endblock %}
+
+{% block content %}
+<h4 class="mb-4"><i class="bi bi-arrow-down-circle text-success"></i> 扫码入库</h4>
+
+<div class="row g-4">
+    <!-- 扫码区域 -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-qr-code-scan"></i> 扫描商品二维码
+            </div>
+            <div class="card-body">
+                <div class="qr-scanner-container">
+                    <video id="qr-video" playsinline autoplay></video>
+                    <div id="qr-result">扫描中...</div>
+                </div>
+                <div class="mt-3 text-center">
+                    <button type="button" class="btn btn-outline-primary" id="toggle-scan">
+                        <i class="bi bi-camera"></i> 打开相机
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 手动输入 -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-keyboard"></i> 手动输入
+            </div>
+            <div class="card-body">
+                <form id="stock-in-form">
+                    <div class="mb-3">
+                        <label class="form-label">商品编码</label>
+                        <input type="text" name="code" id="code-input" class="form-control" placeholder="输入或扫码商品编码">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">数量 *</label>
+                        <input type="number" name="quantity" class="form-control" min="1" required placeholder="入库数量">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">备注</label>
+                        <input type="text" name="remark" class="form-control" placeholder="可选备注">
+                    </div>
+                    <button type="submit" class="btn btn-success w-100">
+                        <i class="bi bi-check-circle"></i> 确认入库
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- 快速选择商品 -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <i class="bi bi-lightning"></i> 快速选择
+            </div>
+            <div class="card-body" style="max-height: 300px; overflow-y: auto;">
+                {% for p in products %}
+                <button type="button" class="btn btn-outline-secondary btn-sm m-1 select-product" data-code="{{ p.code }}" data-name="{{ p.name }}">
+                    {{ p.name }} <span class="badge bg-secondary">{{ p.current_stock }}</span>
+                </button>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 结果提示 -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 9999;">
+    <div id="toast-result" class="toast" role="alert">
+        <div class="toast-body"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<script>
+let scanning = false;
+let video = document.getElementById('qr-video');
+let canvas = document.createElement('canvas');
+let ctx = canvas.getContext('2d');
+let animationId;
+
+function toggleScan() {
+    if (scanning) {
+        stopScan();
+    } else {
+        startScan();
+    }
+}
+
+function startScan() {
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+        .then(stream => {
+            video.srcObject = stream;
+            video.play();
+            scanning = true;
+            document.getElementById('toggle-scan').innerHTML = '<i class="bi bi-camera-off"></i> 关闭相机';
+            scanFrame();
+        })
+        .catch(err => {
+            alert('无法访问相机: ' + err.message);
+        });
+}
+
+function stopScan() {
+    if (video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
+    }
+    if (animationId) {
+        cancelAnimationFrame(animationId);
+    }
+    scanning = false;
+    document.getElementById('toggle-scan').innerHTML = '<i class="bi bi-camera"></i> 打开相机';
+    document.getElementById('qr-result').textContent = '扫描中...';
+}
+
+function scanFrame() {
+    if (!scanning) return;
+    
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        let code = jsQR(imageData.data, imageData.width, imageData.height);
+        
+        if (code) {
+            document.getElementById('qr-result').textContent = '扫描成功: ' + code.data;
+            document.getElementById('code-input').value = code.data;
+            stopScan();
+            
+            // 自动提交
+            setTimeout(() => {
+                if (confirm('是否立即入库此商品?')) {
+                    document.querySelector('#stock-in-form').submit();
+                }
+            }, 500);
+            return;
+        }
+    }
+    
+    animationId = requestAnimationFrame(scanFrame);
+}
+
+document.getElementById('toggle-scan').addEventListener('click', toggleScan);
+
+// 手动提交
+document.querySelector('#stock-in-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const formData = new FormData(e.target);
+    
+    try {
+        const res = await fetch('{{ url_for("do_stock_in") }}', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        
+        const toast = document.getElementById('toast-result');
+        const toastBody = toast.querySelector('.toast-body');
+        
+        if (data.success) {
+            toastBody.innerHTML = '<span class="text-success"><i class="bi bi-check-circle"></i> ' + data.message + '</span>';
+            e.target.reset();
+        } else {
+            toastBody.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle"></i> ' + data.message + '</span>';
+        }
+        
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 3000);
+    } catch (err) {
+        alert('操作失败: ' + err.message);
+    }
+});
+
+// 快速选择商品
+document.querySelectorAll('.select-product').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.getElementById('code-input').value = btn.dataset.code;
+    });
+});
+</script>
+{% endblock %}

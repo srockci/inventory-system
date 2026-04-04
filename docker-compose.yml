@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  inventory:
+    build: .
+    container_name: inventory-system
+    ports:
+      - "5000:5000"
+    volumes:
+      # 持久化数据库
+      - ./instance:/app/instance
+    restart: unless-stopped
+    environment:
+      - FLASK_ENV=production

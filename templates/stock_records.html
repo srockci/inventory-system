@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}{% if type == 'in' %}入库记录{% else %}出库记录{% endif %}{% endblock %}
+
+{% block content %}
+<h4 class="mb-4">
+    <i class="bi bi-clock-history"></i> {% if type == 'in' %}入库记录{% else %}出库记录{% endif %}
+</h4>
+
+<div class="card">
+    <div class="card-body">
+        <!-- 筛选 -->
+        <form method="GET" class="row g-3 mb-3">
+            <div class="col-md-3">
+                <input type="date" name="date_from" class="form-control" value="{{ date_from or '' }}">
+            </div>
+            <div class="col-md-3">
+                <input type="date" name="date_to" class="form-control" value="{{ date_to or '' }}">
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-outline-primary w-100">
+                    <i class="bi bi-search"></i> 筛选
+                </button>
+            </div>
+            <div class="col-md-2">
+                <a href="{{ url_for('stock_in_records' if type == 'in' else 'stock_out_records') }}" class="btn btn-outline-secondary w-100">
+                    <i class="bi bi-x-circle"></i> 清除
+                </a>
+            </div>
+        </form>
+        
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>时间</th>
+                        <th>商品名称</th>
+                        <th>商品编码</th>
+                        <th>数量</th>
+                        <th>操作人</th>
+                        <th>备注</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in records %}
+                    <tr>
+                        <td>{{ r.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td>{{ r.product.name }}</td>
+                        <td><code>{{ r.product.code }}</code></td>
+                        <td>
+                            <span class="badge {% if type == 'in' %}bg-success{% else %}bg-danger{% endif %}">
+                                {% if type == 'in' %}+{% else %}-{% endif %}{{ r.quantity }}
+                            </span>
+                        </td>
+                        <td>{{ r.operator }}</td>
+                        <td>{{ r.remark or '-' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">
+                            暂无记录
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

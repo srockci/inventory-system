@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}分类管理{% endblock %}
+
+{% block content %}
+<h4 class="mb-4"><i class="bi bi-folder"></i> 分类管理</h4>
+
+<div class="row g-4">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-plus-circle"></i> 添加分类
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('add_category') }}">
+                    <div class="input-group">
+                        <input type="text" name="name" class="form-control" placeholder="分类名称" required>
+                        <button type="submit" class="btn btn-primary">添加</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-list"></i> 分类列表
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>分类名称</th>
+                                <th>商品数量</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for cat in categories %}
+                            <tr>
+                                <td>{{ cat.name }}</td>
+                                <td>{{ cat.products|length }}</td>
+                                <td>
+                                    <form method="POST" action="{{ url_for('delete_category', category_id=cat.id) }}" style="display:inline;" onsubmit="return confirm('确定删除?')">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" {% if cat.products|length > 0 %}disabled title="该分类下有商品"{% endif %}>
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="3" class="text-center text-muted">暂无分类</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

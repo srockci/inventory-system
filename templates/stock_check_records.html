@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}盘点记录{% endblock %}
+
+{% block content %}
+<h4 class="mb-4"><i class="bi bi-clipboard-data"></i> 盘点记录</h4>
+
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>时间</th>
+                        <th>商品名称</th>
+                        <th>商品编码</th>
+                        <th>系统库存</th>
+                        <th>实际库存</th>
+                        <th>差异</th>
+                        <th>操作人</th>
+                        <th>备注</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in records %}
+                    <tr class="{% if r.diff != 0 %}table-warning{% endif %}">
+                        <td>{{ r.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td>{{ r.product.name }}</td>
+                        <td><code>{{ r.product.code }}</code></td>
+                        <td>{{ r.system_stock }}</td>
+                        <td>{{ r.actual_stock }}</td>
+                        <td>
+                            {% if r.diff > 0 %}
+                            <span class="badge bg-success">+{{ r.diff }}</span>
+                            {% elif r.diff < 0 %}
+                            <span class="badge bg-danger">{{ r.diff }}</span>
+                            {% else %}
+                            <span class="badge bg-secondary">0</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ r.operator }}</td>
+                        <td>{{ r.remark or '-' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-4">
+                            暂无记录
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

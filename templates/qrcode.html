@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}商品二维码 - {{ product.name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('products') }}">商品管理</a></li>
+        <li class="breadcrumb-item active">商品二维码</li>
+    </ol>
+</nav>
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card text-center">
+            <div class="card-header">
+                <h5 class="mb-0">{{ product.name }}</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <img src="data:image/png;base64,{{ qr_base64 }}" alt="QR Code" style="max-width: 250px; border: 1px solid #ddd; padding: 10px; border-radius: 8px;">
+                </div>
+                
+                <div class="bg-light p-3 rounded mb-3">
+                    <small class="text-muted">商品编码</small>
+                    <h5 class="mb-0"><code>{{ product.code }}</code></h5>
+                </div>
+                
+                <div class="row text-start">
+                    <div class="col-6">
+                        <small class="text-muted">分类</small>
+                        <p class="mb-1">{{ product.category.name if product.category else '-' }}</p>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted">单位</small>
+                        <p class="mb-1">{{ product.unit }}</p>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted">当前库存</small>
+                        <p class="mb-1"><span class="badge bg-{{ 'danger' if product.min_stock > 0 and product.current_stock <= product.min_stock else 'success' }}">{{ product.current_stock }}</span></p>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted">存放位置</small>
+                        <p class="mb-1">{{ product.location or '-' }}</p>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <p class="text-muted small">
+                    <i class="bi bi-info-circle"></i> 用手机扫描此二维码，可快速入库/出库/盘点
+                </p>
+                
+                <a href="{{ url_for('products') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> 返回列表
+                </a>
+            </div>
+        </div>
+        
+        <!-- 打印按钮 -->
+        <div class="card mt-3">
+            <div class="card-body">
+                <div class="d-flex gap-2">
+                    <button onclick="window.print()" class="btn btn-primary">
+                        <i class="bi bi-printer"></i> 打印二维码
+                    </button>
+                    <a href="{{ url_for('edit_product', product_id=product.id) }}" class="btn btn-outline-primary">
+                        <i class="bi bi-pencil"></i> 编辑商品
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
