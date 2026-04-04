@@ -51,6 +51,7 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True, nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
+    role = db.Column(db.String(20), default='user')  # admin, user
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Category(db.Model):
@@ -673,6 +674,45 @@ def users():
     users_list = User.query.all()
     return render_template('users.html', users=users_list)
 
+@app.route('/user/change-password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    """修改自己的密码"""
+    if request.method == 'POST':
+        old_password = request.form.get('old_password')
+        new_password = request.form.get('new_password')
+        confirm_password = request.form.get('confirm_password')
+        
+        if new_password != confirm_password:
+            return jsonify({'success': False, 'message': '两次密码输入不一致'})
+        
+        if len(new_password) < 6:
+            return jsonify({'success': False, 'message': '密码至少6位'})
+        
+        user = User.query.filter_by(username=session.get('username')).first()
+        if not user or not verify_password(old_password, user.password_hash):
+            return jsonify({'success': False, 'message': '原密码错误'})
+        
+        user.password_hash = hash_password(new_password)
+        db.session.commit()
+        return jsonify({'success': True, 'message': '密码修改成功'})
+    
+    return render_template('change_password.html')
+
+@app.route('/user/<int:user_id>/role', methods=['POST'])
+@login_required
+def update_user_role(user_id):
+    """更新用户角色（仅管理员）"""
+    if session.get('username') != 'admin':
+        return jsonify({'success': False, 'message': '无权限'})
+    
+    user = User.query.get_or_404(user_id)
+    role = request.form.get('role', 'user')
+    
+    user.role = role
+    db.session.commit()
+    return jsonify({'success': True, 'message': '权限已更新'})
+
 @app.route('/user/add', methods=['POST'])
 @login_required
 def add_user():
@@ -681,11 +721,12 @@ def add_user():
         return '无权限', 403
     username = request.form.get('username')
     password = request.form.get('password')
+    role = request.form.get('role', 'user')
     
     if User.query.filter_by(username=username).first():
         return jsonify({'success': False, 'message': '用户名已存在'})
     
-    user = User(username=username, password_hash=hash_password(password))
+    user = User(username=username, password_hash=hash_password(password), role=role)
     db.session.add(user)
     db.session.commit()
     return redirect(url_for('users'))
@@ -762,7 +803,7 @@ def init_db():
         
         # 创建管理员账号
         if not User.query.filter_by(username='admin').first():
-            admin = User(username='admin', password_hash=hash_password('admin123'))
+            admin = User(username='admin', password_hash=hash_password('admin123'), role='admin')
             db.session.add(admin)
         
         # 创建默认分类

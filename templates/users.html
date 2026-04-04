@@ -21,6 +21,13 @@
                         <label class="form-label">密码</label>
                         <input type="password" name="password" class="form-control" required minlength="6">
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label">权限</label>
+                        <select name="role" class="form-select">
+                            <option value="user">普通用户</option>
+                            <option value="admin">管理员</option>
+                        </select>
+                    </div>
                     <button type="submit" class="btn btn-primary w-100">
                         <i class="bi bi-plus-circle"></i> 添加
                     </button>
@@ -40,6 +47,7 @@
                         <thead>
                             <tr>
                                 <th>用户名</th>
+                                <th>权限</th>
                                 <th>创建时间</th>
                                 <th>操作</th>
                             </tr>
@@ -49,9 +57,17 @@
                             <tr>
                                 <td>
                                     {{ u.username }}
-                                    {% if u.username == 'admin' %}
-                                    <span class="badge bg-primary ms-1">管理员</span>
+                                    {% if u.username == session.username %}
+                                    <span class="badge bg-secondary ms-1">当前</span>
                                     {% endif %}
+                                </td>
+                                <td>
+                                    <select class="form-select form-select-sm" style="width: auto;" 
+                                            onchange="updateRole({{ u.id }}, this.value)"
+                                            {% if u.username == session.username %}disabled{% endif %}>
+                                        <option value="admin" {% if u.role == 'admin' %}selected{% endif %}>管理员</option>
+                                        <option value="user" {% if u.role == 'user' %}selected{% endif %}>普通用户</option>
+                                    </select>
                                 </td>
                                 <td>{{ u.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
                                 <td>
@@ -76,4 +92,40 @@
         </div>
     </div>
 </div>
+
+<!-- Toast 提示 -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 9999;">
+    <div id="toast-result" class="toast" role="alert">
+        <div class="toast-body"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function showToast(message, isSuccess) {
+    const toast = document.getElementById('toast-result');
+    toast.querySelector('.toast-body').innerHTML = isSuccess 
+        ? '<span class="text-success"><i class="bi bi-check-circle"></i> ' + message + '</span>'
+        : '<span class="text-danger"><i class="bi bi-x-circle"></i> ' + message + '</span>';
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+async function updateRole(userId, role) {
+    try {
+        const formData = new FormData();
+        formData.append('role', role);
+        
+        const res = await fetch(`/user/${userId}/role`, {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        showToast(data.message, data.success);
+    } catch (err) {
+        showToast('操作失败', false);
+    }
+}
+</script>
 {% endblock %}
