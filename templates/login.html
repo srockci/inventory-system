@@ -62,10 +62,33 @@ body.dark-mode .form-label {
 </div>
 
 <script>
-// 初始化日夜模式（从localStorage读取）
-const theme = localStorage.getItem('theme') || 'light';
-if (theme === 'dark') {
-    document.body.classList.add('dark-mode');
+// 初始化日夜模式（从localStorage读取，支持跟随系统）
+function applyTheme() {
+    const theme = localStorage.getItem('theme') || 'system';
+    let isDark = false;
+    
+    if (theme === 'dark') {
+        isDark = true;
+    } else if (theme === 'light') {
+        isDark = false;
+    } else {
+        isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    
+    if (isDark) {
+        document.body.classList.add('dark-mode');
+    } else {
+        document.body.classList.remove('dark-mode');
+    }
 }
+
+applyTheme();
+
+// 监听系统主题变化
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if ((localStorage.getItem('theme') || 'system') === 'system') {
+        applyTheme();
+    }
+});
 </script>
 {% endblock %}

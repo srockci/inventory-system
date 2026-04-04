@@ -292,9 +292,7 @@
             </button>
         </div>
         
-        <div class="sidebar-user px-3 py-2 border-bottom border-secondary">
-            <small class="text-muted">当前用户：{{ session.username }}</small>
-        </div>
+
         
         <!-- 商品 -->
         <div class="menu-category">商品</div>
@@ -348,12 +346,6 @@
             <i class="bi bi-gear"></i> 系统设置
         </a>
         {% endif %}
-        
-        <div class="mt-auto border-top border-secondary">
-            <a href="{{ url_for('logout') }}">
-                <i class="bi bi-box-arrow-right"></i> 退出
-            </a>
-        </div>
     </nav>
     
     <!-- 主内容 -->
@@ -362,9 +354,22 @@
         <div class="position-fixed top-0 end-0 p-3" style="z-index: 1030;">
             <div class="d-flex gap-2 align-items-center">
                 <!-- 日夜切换 -->
-                <button class="btn btn-link text-muted p-1" id="theme-toggle" title="切换主题">
-                    <i class="bi bi-moon" id="theme-icon" style="font-size: 1.3rem;"></i>
-                </button>
+                <div class="dropdown">
+                    <button class="btn btn-link text-muted p-1" data-bs-toggle="dropdown" title="切换主题" id="theme-btn">
+                        <i class="bi bi-circle-half" id="theme-icon" style="font-size: 1.3rem;"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="#" onclick="setTheme('light'); return false;">
+                            <i class="bi bi-sun me-2"></i>日间模式
+                        </a></li>
+                        <li><a class="dropdown-item" href="#" onclick="setTheme('dark'); return false;">
+                            <i class="bi bi-moon me-2"></i>夜间模式
+                        </a></li>
+                        <li><a class="dropdown-item" href="#" onclick="setTheme('system'); return false;">
+                            <i class="bi bi-circle-half me-2"></i>跟随系统
+                        </a></li>
+                    </ul>
+                </div>
                 <!-- 用户菜单 -->
                 <div class="dropdown">
                     <button class="btn btn-link text-muted p-1" data-bs-toggle="dropdown" title="菜单">
@@ -421,35 +426,54 @@
     }
     
     // 日夜模式切换
-    const themeToggle = document.getElementById('theme-toggle');
     const themeIcon = document.getElementById('theme-icon');
     
-    // 从localStorage读取主题
     function getTheme() {
-        return localStorage.getItem('theme') || 'light';
+        return localStorage.getItem('theme') || 'system';
+    }
+    
+    function applyTheme(theme) {
+        let isDark = false;
+        
+        if (theme === 'dark') {
+            isDark = true;
+        } else if (theme === 'light') {
+            isDark = false;
+        } else {
+            // 跟随系统
+            isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        }
+        
+        if (isDark) {
+            document.body.classList.add('dark-mode');
+        } else {
+            document.body.classList.remove('dark-mode');
+        }
+        
+        // 更新图标
+        if (theme === 'system') {
+            themeIcon.className = 'bi bi-circle-half';
+        } else if (isDark) {
+            themeIcon.className = 'bi bi-moon';
+        } else {
+            themeIcon.className = 'bi bi-sun';
+        }
     }
     
     function setTheme(theme) {
-        if (theme === 'dark') {
-            document.body.classList.add('dark-mode');
-            themeIcon.className = 'bi bi-sun';
-        } else {
-            document.body.classList.remove('dark-mode');
-            themeIcon.className = 'bi bi-moon';
-        }
         localStorage.setItem('theme', theme);
+        applyTheme(theme);
     }
     
     // 初始化主题
-    setTheme(getTheme());
+    applyTheme(getTheme());
     
-    // 切换主题
-    if (themeToggle) {
-        themeToggle.addEventListener('click', () => {
-            const current = getTheme();
-            setTheme(current === 'light' ? 'dark' : 'light');
-        });
-    }
+    // 监听系统主题变化
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+        if (getTheme() === 'system') {
+            applyTheme('system');
+        }
+    });
     </script>
     {% block extra_js %}{% endblock %}
 </body>
