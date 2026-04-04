@@ -519,6 +519,69 @@ def add_user():
     db.session.commit()
     return redirect(url_for('users'))
 
+@app.route('/user/<int:user_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_user(user_id):
+    """编辑用户"""
+    if session.get('username') != 'admin':
+        return '无权限', 403
+    
+    user = User.query.get_or_404(user_id)
+    
+    if request.method == 'POST':
+        new_username = request.form.get('username')
+        
+        # 检查新用户名是否被占用（排除自己）
+        if new_username != user.username and User.query.filter_by(username=new_username).first():
+            return jsonify({'success': False, 'message': '用户名已存在'})
+        
+        user.username = new_username
+        db.session.commit()
+        return redirect(url_for('users'))
+    
+    return render_template('user_edit.html', user=user)
+
+@app.route('/user/<int:user_id>/reset-password', methods=['GET', 'POST'])
+@login_required
+def reset_user_password(user_id):
+    """重置用户密码（仅管理员）"""
+    if session.get('username') != 'admin':
+        return '无权限', 403
+    
+    user = User.query.get_or_404(user_id)
+    
+    if request.method == 'POST':
+        new_password = request.form.get('password')
+        if len(new_password) < 6:
+            return jsonify({'success': False, 'message': '密码至少6位'})
+        
+        user.password_hash = hash_password(new_password)
+        db.session.commit()
+        return jsonify({'success': True, 'message': f'密码已重置为: {new_password}'})
+    
+    return render_template('user_reset_password.html', user=user)
+
+@app.route('/user/<int:user_id>/delete', methods=['POST'])
+@login_required
+def delete_user(user_id):
+    """删除用户"""
+    if session.get('username') != 'admin':
+        return '无权限', 403
+    
+    user = User.query.get_or_404(user_id)
+    
+    # 不允许删除自己
+    if user.username == session.get('username'):
+        return jsonify({'success': False, 'message': '不能删除自己'})
+    
+    # 不允许删除最后一个管理员
+    if user.username == 'admin' and User.query.filter_by(username='admin').count() <= 1:
+        return jsonify({'success': False, 'message': '不能删除最后一个管理员'})
+    
+    db.session.delete(user)
+    db.session.commit()
+    return redirect(url_for('users'))
+
 # ============ 初始化 ============
 
 def init_db():

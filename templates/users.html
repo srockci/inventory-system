@@ -19,7 +19,7 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label">密码</label>
-                        <input type="password" name="password" class="form-control" required>
+                        <input type="password" name="password" class="form-control" required minlength="6">
                     </div>
                     <button type="submit" class="btn btn-primary w-100">
                         <i class="bi bi-plus-circle"></i> 添加
@@ -41,6 +41,7 @@
                             <tr>
                                 <th>用户名</th>
                                 <th>创建时间</th>
+                                <th>操作</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -53,6 +54,19 @@
                                     {% endif %}
                                 </td>
                                 <td>{{ u.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>
+                                    <a href="{{ url_for('edit_user', user_id=u.id) }}" class="btn btn-sm btn-outline-primary" title="编辑">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <a href="{{ url_for('reset_user_password', user_id=u.id) }}" class="btn btn-sm btn-outline-warning" title="重置密码">
+                                        <i class="bi bi-key"></i>
+                                    </a>
+                                    <form method="POST" action="{{ url_for('delete_user', user_id=u.id) }}" style="display:inline;" onsubmit="return confirm('确定删除用户 【{{ u.username }}】 吗？')">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="删除" {% if u.username == 'admin' and users|length <= 1 %}disabled{% endif %}>
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
                             </tr>
                             {% endfor %}
                         </tbody>
