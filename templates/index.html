@@ -63,41 +63,38 @@
 
 <!-- 快捷操作 -->
 <div class="row g-3">
-    <div class="col-6 col-md-4">
+    <div class="col-4">
         <a href="{{ url_for('stock_in_page') }}" class="text-decoration-none">
-            <div class="card h-100">
-                <div class="card-body text-center py-4">
-                    <div class="rounded-circle bg-success bg-opacity-10 d-inline-flex p-3 mb-3">
-                        <i class="bi bi-qr-code-scan text-success" style="font-size: 2rem;"></i>
+            <div class="card h-100 text-center">
+                <div class="card-body py-3">
+                    <div class="bg-success bg-opacity-10 rounded p-3 mb-2">
+                        <i class="bi bi-qr-code-scan text-success" style="font-size: 1.5rem;"></i>
                     </div>
-                    <h6 class="card-title mb-1">扫码入库</h6>
-                    <small class="text-muted">使用手机摄像头扫描商品二维码入库</small>
+                    <h6 class="mb-0">入库</h6>
                 </div>
             </div>
         </a>
     </div>
-    <div class="col-6 col-md-4">
+    <div class="col-4">
         <a href="{{ url_for('stock_out_page') }}" class="text-decoration-none">
-            <div class="card h-100">
-                <div class="card-body text-center py-4">
-                    <div class="rounded-circle bg-danger bg-opacity-10 d-inline-flex p-3 mb-3">
-                        <i class="bi bi-upc-scan text-danger" style="font-size: 2rem;"></i>
+            <div class="card h-100 text-center">
+                <div class="card-body py-3">
+                    <div class="bg-danger bg-opacity-10 rounded p-3 mb-2">
+                        <i class="bi bi-upc-scan text-danger" style="font-size: 1.5rem;"></i>
                     </div>
-                    <h6 class="card-title mb-1">扫码出库</h6>
-                    <small class="text-muted">使用手机摄像头扫描商品二维码出库</small>
+                    <h6 class="mb-0">出库</h6>
                 </div>
             </div>
         </a>
     </div>
-    <div class="col-6 col-md-4">
+    <div class="col-4">
         <a href="{{ url_for('stock_check_page') }}" class="text-decoration-none">
-            <div class="card h-100">
-                <div class="card-body text-center py-4">
-                    <div class="rounded-circle bg-warning bg-opacity-10 d-inline-flex p-3 mb-3">
-                        <i class="bi bi-clipboard-check text-warning" style="font-size: 2rem;"></i>
+            <div class="card h-100 text-center">
+                <div class="card-body py-3">
+                    <div class="bg-warning bg-opacity-10 rounded p-3 mb-2">
+                        <i class="bi bi-clipboard-check text-warning" style="font-size: 1.5rem;"></i>
                     </div>
-                    <h6 class="card-title mb-1">扫码盘点</h6>
-                    <small class="text-muted">使用手机摄像头扫描商品进行库存盘点</small>
+                    <h6 class="mb-0">盘点</h6>
                 </div>
             </div>
         </a>
