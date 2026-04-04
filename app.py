@@ -3,7 +3,7 @@
 支持扫码入库/出库/盘点，商品二维码生成
 """
 
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_file
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_file, g
 from flask_sqlalchemy import SQLAlchemy
 from functools import wraps
 import sqlite3
@@ -23,6 +23,13 @@ app.secret_key = os.urandom(24)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///inventory.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+@app.before_request
+def inject_settings():
+    """全局注入系统设置到所有模板"""
+    g.system_name = SystemSettings.get('system_name', '物资管理系统')
+    g.system_logo = SystemSettings.get('system_logo', '')
+    g.login_background = SystemSettings.get('login_background', '')
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -51,6 +58,27 @@ class Category(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class SystemSettings(db.Model):
+    """系统设置表"""
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(100), unique=True, nullable=False)
+    value = db.Column(db.Text)
+
+    @staticmethod
+    def get(key, default=''):
+        setting = SystemSettings.query.filter_by(key=key).first()
+        return setting.value if setting else default
+    
+    @staticmethod
+    def set(key, value):
+        setting = SystemSettings.query.filter_by(key=key).first()
+        if setting:
+            setting.value = value
+        else:
+            setting = SystemSettings(key=key, value=value)
+            db.session.add(setting)
+        db.session.commit()
 
 class Product(db.Model):
     """商品表"""
@@ -536,6 +564,104 @@ def high_stock_alerts():
     ).order_by(Product.current_stock.desc()).all()
     return render_template('alerts.html', products=high_stock, alert_type='high')
 
+# ---- 系统设置 ----
+
+@app.route('/settings')
+@login_required
+def settings():
+    """系统设置"""
+    if session.get('username') != 'admin':
+        return '无权限', 403
+    
+    # 获取当前设置
+    system_name = SystemSettings.get('system_name', '物资管理系统')
+    system_logo = SystemSettings.get('system_logo', '')
+    login_background = SystemSettings.get('login_background', '')
+    
+    return render_template('settings.html', 
+                         system_name=system_name,
+                         system_logo=system_logo,
+                         login_background=login_background)
+
+@app.route('/settings/upload-logo', methods=['POST'])
+@login_required
+def upload_logo():
+    """上传系统Logo"""
+    if session.get('username') != 'admin':
+        return jsonify({'success': False, 'message': '无权限'})
+    
+    if 'logo' not in request.files:
+        return jsonify({'success': False, 'message': '没有文件'})
+    
+    file = request.files['logo']
+    if file.filename == '':
+        return jsonify({'success': False, 'message': '没有选择文件'})
+    
+    if file and allowed_file(file.filename):
+        ext = file.filename.rsplit('.', 1)[1].lower()
+        filename = f"logo.{ext}"
+        file.save(os.path.join(UPLOAD_FOLDER, filename))
+        SystemSettings.set('system_logo', filename)
+        return jsonify({'success': True, 'message': 'Logo上传成功'})
+    
+    return jsonify({'success': False, 'message': '不支持的文件格式'})
+
+@app.route('/settings/upload-background', methods=['POST'])
+@login_required
+def upload_background():
+    """上传登录页背景"""
+    if session.get('username') != 'admin':
+        return jsonify({'success': False, 'message': '无权限'})
+    
+    if 'background' not in request.files:
+        return jsonify({'success': False, 'message': '没有文件'})
+    
+    file = request.files['background']
+    if file.filename == '':
+        return jsonify({'success': False, 'message': '没有选择文件'})
+    
+    if file and allowed_file(file.filename):
+        ext = file.filename.rsplit('.', 1)[1].lower()
+        filename = f"background.{ext}"
+        file.save(os.path.join(UPLOAD_FOLDER, filename))
+        SystemSettings.set('login_background', filename)
+        return jsonify({'success': True, 'message': '背景上传成功'})
+    
+    return jsonify({'success': False, 'message': '不支持的文件格式'})
+
+@app.route('/settings/update', methods=['POST'])
+@login_required
+def update_settings():
+    """更新系统设置"""
+    if session.get('username') != 'admin':
+        return jsonify({'success': False, 'message': '无权限'})
+    
+    system_name = request.form.get('system_name', '')
+    login_background_url = request.form.get('login_background_url', '')
+    
+    SystemSettings.set('system_name', system_name)
+    SystemSettings.set('login_background', login_background_url)
+    
+    return jsonify({'success': True, 'message': '设置已保存'})
+
+@app.route('/settings/reset-logo', methods=['POST'])
+@login_required
+def reset_logo():
+    """删除Logo"""
+    if session.get('username') != 'admin':
+        return jsonify({'success': False, 'message': '无权限'})
+    SystemSettings.set('system_logo', '')
+    return jsonify({'success': True, 'message': 'Logo已删除'})
+
+@app.route('/settings/reset-background', methods=['POST'])
+@login_required
+def reset_background():
+    """删除登录背景"""
+    if session.get('username') != 'admin':
+        return jsonify({'success': False, 'message': '无权限'})
+    SystemSettings.set('login_background', '')
+    return jsonify({'success': True, 'message': '背景已删除'})
+
 # ---- 用户管理 ----
 
 @app.route('/users')
@@ -644,6 +770,10 @@ def init_db():
             default_categories = ['办公用品', '电子设备', '工具', '耗材', '其他']
             for name in default_categories:
                 db.session.add(Category(name=name))
+        
+        # 创建默认系统设置
+        if SystemSettings.get('system_name') == '':
+            SystemSettings.set('system_name', '物资管理系统')
         
         db.session.commit()
         print('数据库初始化完成')

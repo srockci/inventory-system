@@ -1,14 +1,32 @@
 {% extends "base.html" %}
 
-{% block title %}登录 - 物资管理系统{% endblock %}
+{% block title %}登录 - {{ g.system_name }}{% endblock %}
 
 {% block login_content %}
+{% if g.login_background %}
+<style>
+body {
+    background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), 
+                url('{{ url_for("static", filename="uploads/" + g.login_background) }}');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+}
+</style>
+{% endif %}
+
 <div class="container">
     <div class="row justify-content-center align-items-center" style="min-height: 100vh;">
         <div class="col-md-4">
-            <div class="card p-4 fade-in">
+            <div class="card p-4 fade-in" {% if g.login_background %}style="background: rgba(255,255,255,0.95);"{% endif %}>
                 <div class="text-center mb-4">
-                    <h3><i class="bi bi-box-seam"></i> 物资管理系统</h3>
+                    {% if g.system_logo %}
+                    <img src="{{ url_for('static', filename='uploads/' + g.system_logo) }}" 
+                         alt="logo" class="mb-3" style="max-height: 60px;">
+                    {% else %}
+                    <h2><i class="bi bi-box-seam"></i></h2>
+                    {% endif %}
+                    <h4>{{ g.system_name }}</h4>
                 </div>
                 {% if error %}
                 <div class="alert alert-danger">{{ error }}</div>
@@ -24,7 +42,6 @@
                     </div>
                     <button type="submit" class="btn btn-primary w-100">登录</button>
                 </form>
-                
             </div>
         </div>
     </div>
