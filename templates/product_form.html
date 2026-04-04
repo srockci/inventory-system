@@ -1,35 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ '编辑商品' if product else '添加商品' }}{% block extra_js %}
-<script>
-document.querySelector('#product-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    const btn = document.getElementById('save-btn');
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 保存中...';
-    
-    const formData = new FormData(e.target);
-    
-    try {
-        const res = await fetch(window.location.href, {
-            method: 'POST',
-            body: formData
-        });
-        
-        showToast('保存成功', true);
-        setTimeout(() => {
-            window.location.href = '{{ url_for("products") }}';
-        }, 1000);
-    } catch (err) {
-        showToast('保存失败: ' + err.message, false);
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-check-circle"></i> 保存';
-    }
-});
-</script>
-{% endblock %}
-{% endblock %}
+{% block title %}{{ '编辑商品' if product else '添加商品' }}{% endblock %}
 
 {% block content %}
 <nav aria-label="breadcrumb mb-3">
@@ -124,6 +95,8 @@ document.querySelector('#product-form').addEventListener('submit', async (e) => 
         </div>
     </div>
 </div>
+{% endblock %}
+
 {% block extra_js %}
 <script>
 document.querySelector('#product-form').addEventListener('submit', async (e) => {
@@ -152,5 +125,4 @@ document.querySelector('#product-form').addEventListener('submit', async (e) => 
     }
 });
 </script>
-{% endblock %}
 {% endblock %}
