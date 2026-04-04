@@ -517,12 +517,24 @@ def delete_category(category_id):
 @app.route('/alerts')
 @login_required
 def alerts():
-    """库存预警"""
+    """库存预警（低库存）"""
     low_stock = Product.query.filter(
         Product.current_stock <= Product.min_stock,
         Product.min_stock > 0
     ).order_by(Product.current_stock).all()
-    return render_template('alerts.html', products=low_stock)
+    return render_template('alerts.html', products=low_stock, alert_type='low')
+
+@app.route('/high-stock-alerts')
+@login_required
+def high_stock_alerts():
+    """高库存预警"""
+    # 高库存 = 库存超过最高库存（暂时用 min_stock * 3 作为默认值，或者需要加 max_stock 字段）
+    # 这里先简单实现：如果设置了预警值且库存超过预警值的 3 倍
+    high_stock = Product.query.filter(
+        Product.min_stock > 0,
+        Product.current_stock >= Product.min_stock * 3
+    ).order_by(Product.current_stock.desc()).all()
+    return render_template('alerts.html', products=high_stock, alert_type='high')
 
 # ---- 用户管理 ----
 
