@@ -663,6 +663,110 @@ def reset_background():
     SystemSettings.set('login_background', '')
     return jsonify({'success': True, 'message': '背景已删除'})
 
+# ---- 权限管理 ----
+
+# 默认权限配置
+DEFAULT_PERMISSIONS = {
+    'user': {
+        'stock_in': True,
+        'stock_out': True,
+        'stock_check': True,
+        'products_view': True,
+        'products_edit': False,
+        'products_delete': False,
+        'categories_edit': False,
+        'users_view': False,
+        'users_edit': False,
+        'settings_view': False,
+        'settings_edit': False,
+        'reports_view': True,
+    },
+    'admin': {
+        'stock_in': True,
+        'stock_out': True,
+        'stock_check': True,
+        'products_view': True,
+        'products_edit': True,
+        'products_delete': True,
+        'categories_edit': True,
+        'users_view': True,
+        'users_edit': True,
+        'settings_view': True,
+        'settings_edit': True,
+        'reports_view': True,
+    }
+}
+
+PERMISSION_LABELS = {
+    'stock_in': '入库操作',
+    'stock_out': '出库操作',
+    'stock_check': '盘点操作',
+    'products_view': '查看商品',
+    'products_edit': '编辑商品',
+    'products_delete': '删除商品',
+    'categories_edit': '管理分类',
+    'users_view': '查看用户',
+    'users_edit': '管理用户',
+    'settings_view': '查看设置',
+    'settings_edit': '修改设置',
+    'reports_view': '查看报表',
+}
+
+PERMISSION_GROUPS = {
+    '库存操作': ['stock_in', 'stock_out', 'stock_check'],
+    '商品管理': ['products_view', 'products_edit', 'products_delete'],
+    '系统管理': ['categories_edit', 'users_view', 'users_edit', 'settings_view', 'settings_edit'],
+    '报表': ['reports_view'],
+}
+
+@app.route('/permissions')
+@login_required
+def permissions():
+    """权限管理"""
+    if session.get('username') != 'admin':
+        return '无权限', 403
+    
+    # 获取当前权限配置
+    permissions_config = SystemSettings.get('permissions', '')
+    if permissions_config:
+        import json
+        permissions = json.loads(permissions_config)
+    else:
+        permissions = DEFAULT_PERMISSIONS.copy()
+    
+    return render_template('permissions.html', 
+                         permissions=permissions,
+                         permission_labels=PERMISSION_LABELS,
+                         permission_groups=PERMISSION_GROUPS)
+
+@app.route('/permissions/save', methods=['POST'])
+@login_required
+def save_permissions():
+    """保存权限配置"""
+    if session.get('username') != 'admin':
+        return jsonify({'success': False, 'message': '无权限'})
+    
+    import json
+    permissions = {}
+    for role in ['user', 'admin']:
+        permissions[role] = {}
+        for perm_key in PERMISSION_LABELS.keys():
+            permissions[role][perm_key] = request.form.get(f'{role}_{perm_key}') == 'on'
+    
+    SystemSettings.set('permissions', json.dumps(permissions))
+    return jsonify({'success': True, 'message': '权限配置已保存'})
+
+@app.route('/permissions/reset', methods=['POST'])
+@login_required
+def reset_permissions():
+    """重置权限为默认"""
+    if session.get('username') != 'admin':
+        return jsonify({'success': False, 'message': '无权限'})
+    
+    import json
+    SystemSettings.set('permissions', json.dumps(DEFAULT_PERMISSIONS))
+    return jsonify({'success': True, 'message': '已重置为默认权限'})
+
 # ---- 用户管理 ----
 
 @app.route('/users')
