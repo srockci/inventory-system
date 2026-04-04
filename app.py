@@ -393,7 +393,8 @@ def stock_in_records():
 def stock_out_page():
     """出库页面"""
     products = Product.query.order_by(Product.name).all()
-    return render_template('stock_out.html', products=products)
+    categories = Category.query.order_by(Category.name).all()
+    return render_template('stock_out.html', products=products, categories=categories)
 
 @app.route('/stock-out/do', methods=['POST'])
 @login_required
@@ -458,7 +459,8 @@ def stock_out_records():
 def stock_check_page():
     """盘点页面"""
     products = Product.query.order_by(Product.name).all()
-    return render_template('stock_check.html', products=products)
+    categories = Category.query.order_by(Category.name).all()
+    return render_template('stock_check.html', products=products, categories=categories)
 
 @app.route('/stock-check/do', methods=['POST'])
 @login_required

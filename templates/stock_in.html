@@ -6,9 +6,10 @@
 <h4 class="mb-4"><i class="bi bi-arrow-down-circle text-success"></i> 扫码入库</h4>
 
 <div class="row g-4">
-    <!-- 扫码区域 -->
+    <!-- 左侧：扫码 + 商品选择 -->
     <div class="col-lg-6">
-        <div class="card">
+        <!-- 扫码区域 -->
+        <div class="card mb-3">
             <div class="card-header">
                 <i class="bi bi-qr-code-scan"></i> 扫描商品二维码
             </div>
@@ -24,23 +25,59 @@
                 </div>
             </div>
         </div>
+        
+        <!-- 商品选择 -->
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-hand-index"></i> 商品选择
+            </div>
+            <div class="card-body">
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="form-label">选择分类</label>
+                        <select id="category-select" class="form-select">
+                            <option value="">全部分类</option>
+                            {% for cat in categories %}
+                            <option value="{{ cat.id }}">{{ cat.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">选择商品</label>
+                        <select id="product-select" class="form-select">
+                            <option value="">请先选择分类</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
     
-    <!-- 手动输入 -->
+    <!-- 右侧：表单 -->
     <div class="col-lg-6">
         <div class="card">
             <div class="card-header">
-                <i class="bi bi-keyboard"></i> 手动输入
+                <i class="bi bi-keyboard"></i> 入库信息
             </div>
             <div class="card-body">
                 <form id="stock-in-form">
                     <div class="mb-3">
                         <label class="form-label">商品编码</label>
-                        <input type="text" name="code" id="code-input" class="form-control" placeholder="输入或扫码商品编码">
+                        <div class="input-group">
+                            <input type="text" name="code" id="code-input" class="form-control" placeholder="扫码或选择商品">
+                            <button type="button" class="btn btn-outline-secondary" id="clear-code">
+                                <i class="bi bi-x"></i>
+                            </button>
+                        </div>
+                        <!-- 显示选中的商品信息 -->
+                        <div id="selected-product-info" class="mt-2 text-muted small" style="display: none;">
+                            <span id="selected-product-name"></span>
+                            <span class="ms-2">当前库存: <strong id="selected-product-stock"></strong></span>
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">数量 *</label>
-                        <input type="number" name="quantity" class="form-control" min="1" required placeholder="入库数量">
+                        <input type="number" name="quantity" id="quantity" class="form-control" min="1" required placeholder="入库数量" value="1">
                     </div>
                     <div class="mb-3">
                         <label class="form-label">备注</label>
@@ -50,20 +87,6 @@
                         <i class="bi bi-check-circle"></i> 确认入库
                     </button>
                 </form>
-            </div>
-        </div>
-        
-        <!-- 快速选择商品 -->
-        <div class="card mt-3">
-            <div class="card-header">
-                <i class="bi bi-lightning"></i> 快速选择
-            </div>
-            <div class="card-body" style="max-height: 300px; overflow-y: auto;">
-                {% for p in products %}
-                <button type="button" class="btn btn-outline-secondary btn-sm m-1 select-product" data-code="{{ p.code }}" data-name="{{ p.name }}">
-                    {{ p.name }} <span class="badge bg-secondary">{{ p.current_stock }}</span>
-                </button>
-                {% endfor %}
             </div>
         </div>
     </div>
@@ -80,6 +103,67 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <script>
+// 所有商品数据（从后端传递）
+const allProducts = [
+    {% for p in products %}
+    { code: '{{ p.code }}', name: '{{ p.name }}', stock: {{ p.current_stock }}, unit: '{{ p.unit }}', category_id: {{ p.category_id or 'null' }} }{% if not loop.last %},{% endif %}
+    {% endfor %}
+];
+
+const categories = [
+    {% for cat in categories %}
+    { id: {{ cat.id }}, name: '{{ cat.name }}' }{% if not loop.last %},{% endif %}
+    {% endfor %}
+];
+
+// 商品选择联动
+document.getElementById('category-select').addEventListener('change', function() {
+    const categoryId = this.value;
+    const productSelect = document.getElementById('product-select');
+    productSelect.innerHTML = '<option value="">请选择商品</option>';
+    
+    const filtered = categoryId 
+        ? allProducts.filter(p => p.category_id == categoryId)
+        : allProducts;
+    
+    filtered.forEach(p => {
+        const option = document.createElement('option');
+        option.value = p.code;
+        option.textContent = `${p.name} (库存: ${p.stock})`;
+        productSelect.appendChild(option);
+    });
+    
+    if (filtered.length > 0) {
+        productSelect.disabled = false;
+    } else {
+        productSelect.disabled = true;
+    }
+});
+
+// 选择商品后填充编码
+document.getElementById('product-select').addEventListener('change', function() {
+    const code = this.value;
+    const product = allProducts.find(p => p.code === code);
+    
+    if (product) {
+        document.getElementById('code-input').value = product.code;
+        document.getElementById('selected-product-name').textContent = product.name;
+        document.getElementById('selected-product-stock').textContent = product.stock + ' ' + product.unit;
+        document.getElementById('selected-product-info').style.display = 'block';
+        document.getElementById('quantity').focus();
+    } else {
+        document.getElementById('selected-product-info').style.display = 'none';
+    }
+});
+
+// 清除商品编码
+document.getElementById('clear-code').addEventListener('click', function() {
+    document.getElementById('code-input').value = '';
+    document.getElementById('product-select').value = '';
+    document.getElementById('selected-product-info').style.display = 'none';
+});
+
+// 扫码功能
 let scanning = false;
 let video = document.getElementById('qr-video');
 let canvas = document.createElement('canvas');
@@ -104,7 +188,7 @@ function startScan() {
             scanFrame();
         })
         .catch(err => {
-            alert('无法访问相机: ' + err.message);
+            showToast('无法访问相机: ' + err.message, false);
         });
 }
 
@@ -136,12 +220,15 @@ function scanFrame() {
             document.getElementById('code-input').value = code.data;
             stopScan();
             
-            // 自动提交
-            setTimeout(() => {
-                if (confirm('是否立即入库此商品?')) {
-                    document.querySelector('#stock-in-form').submit();
-                }
-            }, 500);
+            // 自动查找商品信息
+            const product = allProducts.find(p => p.code === code.data.replace('INV:', ''));
+            if (product) {
+                document.getElementById('selected-product-name').textContent = product.name;
+                document.getElementById('selected-product-stock').textContent = product.stock + ' ' + product.unit;
+                document.getElementById('selected-product-info').style.display = 'block';
+                document.getElementById('quantity').focus();
+            }
+            
             return;
         }
     }
@@ -151,7 +238,7 @@ function scanFrame() {
 
 document.getElementById('toggle-scan').addEventListener('click', toggleScan);
 
-// 手动提交
+// 提交表单
 document.querySelector('#stock-in-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     
@@ -165,27 +252,21 @@ document.querySelector('#stock-in-form').addEventListener('submit', async (e) =>
         const data = await res.json();
         
         const toast = document.getElementById('toast-result');
-        const toastBody = toast.querySelector('.toast-body');
         
         if (data.success) {
-            toastBody.innerHTML = '<span class="text-success"><i class="bi bi-check-circle"></i> ' + data.message + '</span>';
+            toast.querySelector('.toast-body').innerHTML = '<span class="text-success"><i class="bi bi-check-circle"></i> ' + data.message + '</span>';
             e.target.reset();
+            document.getElementById('selected-product-info').style.display = 'none';
+            document.getElementById('product-select').value = '';
         } else {
-            toastBody.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle"></i> ' + data.message + '</span>';
+            toast.querySelector('.toast-body').innerHTML = '<span class="text-danger"><i class="bi bi-x-circle"></i> ' + data.message + '</span>';
         }
         
         toast.classList.add('show');
         setTimeout(() => toast.classList.remove('show'), 3000);
     } catch (err) {
-        alert('操作失败: ' + err.message);
+        showToast('操作失败: ' + err.message, false);
     }
-});
-
-// 快速选择商品
-document.querySelectorAll('.select-product').forEach(btn => {
-    btn.addEventListener('click', () => {
-        document.getElementById('code-input').value = btn.dataset.code;
-    });
 });
 </script>
 {% endblock %}
