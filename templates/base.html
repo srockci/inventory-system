@@ -97,6 +97,79 @@
             border-radius: 12px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.05);
         }
+        
+        /* 夜间模式 */
+        body.dark-mode {
+            background: #1a1a2e;
+            color: #e0e0e0;
+        }
+        body.dark-mode .card {
+            background: #16213e;
+            color: #e0e0e0;
+        }
+        body.dark-mode .table {
+            color: #e0e0e0;
+        }
+        body.dark-mode .table-hover tbody tr:hover {
+            background: rgba(255,255,255,0.05);
+            color: #fff;
+        }
+        body.dark-mode .text-muted {
+            color: #a0a0a0 !important;
+        }
+        body.dark-mode .bg-light {
+            background: #2d2d44 !important;
+        }
+        body.dark-mode .border, body.dark-mode .dropdown-divider {
+            border-color: #3d3d5c !important;
+        }
+        body.dark-mode .dropdown-menu {
+            background: #16213e;
+            border: 1px solid #3d3d5c;
+        }
+        body.dark-mode .dropdown-item {
+            color: #e0e0e0;
+        }
+        body.dark-mode .dropdown-item:hover {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+        }
+        body.dark-mode .form-control {
+            background: #2d2d44;
+            border-color: #3d3d5c;
+            color: #e0e0e0;
+        }
+        body.dark-mode .form-select {
+            background-color: #2d2d44;
+            border-color: #3d3d5c;
+            color: #e0e0e0;
+        }
+        body.dark-mode .btn-outline-secondary {
+            border-color: #3d3d5c;
+            color: #e0e0e0;
+        }
+        body.dark-mode .btn-outline-secondary:hover {
+            background: rgba(255,255,255,0.1);
+        }
+        body.dark-mode .mobile-header,
+        body.dark-mode .sidebar {
+            background: #0f0f23;
+        }
+        body.dark-mode .sidebar-header {
+            border-color: #2d2d44 !important;
+        }
+        body.dark-mode .sidebar-user {
+            border-color: #2d2d44 !important;
+        }
+        body.dark-mode .border-top {
+            border-color: #2d2d44 !important;
+        }
+        body.dark-mode .border-bottom {
+            border-color: #2d2d44 !important;
+        }
+        body.dark-mode .border-secondary {
+            border-color: #3d3d5c !important;
+        }
         .stat-card {
             padding: 20px;
             border-radius: 12px;
@@ -285,6 +358,31 @@
     
     <!-- 主内容 -->
     <div class="main-content" id="main-content">
+        <!-- 右上角工具栏 -->
+        <div class="position-fixed top-0 end-0 p-3" style="z-index: 1030;">
+            <div class="d-flex gap-2 align-items-center">
+                <!-- 日夜切换 -->
+                <button class="btn btn-link text-muted p-1" id="theme-toggle" title="切换主题">
+                    <i class="bi bi-moon" id="theme-icon" style="font-size: 1.3rem;"></i>
+                </button>
+                <!-- 用户菜单 -->
+                <div class="dropdown">
+                    <button class="btn btn-link text-muted p-1" data-bs-toggle="dropdown" title="菜单">
+                        <i class="bi bi-person-circle" style="font-size: 1.3rem;"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><span class="dropdown-item-text text-muted"><small>{{ session.username }}</small></span></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{{ url_for('settings') }}">
+                            <i class="bi bi-gear me-2"></i>个人设置
+                        </a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('logout') }}">
+                            <i class="bi bi-box-arrow-right me-2"></i>退出登录
+                        </a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
         {% block content %}{% endblock %}
     </div>
     {% else %}
@@ -319,6 +417,37 @@
     if (window.innerWidth <= 768) {
         document.querySelectorAll('.sidebar a').forEach(link => {
             link.addEventListener('click', closeMenu);
+        });
+    }
+    
+    // 日夜模式切换
+    const themeToggle = document.getElementById('theme-toggle');
+    const themeIcon = document.getElementById('theme-icon');
+    
+    // 从localStorage读取主题
+    function getTheme() {
+        return localStorage.getItem('theme') || 'light';
+    }
+    
+    function setTheme(theme) {
+        if (theme === 'dark') {
+            document.body.classList.add('dark-mode');
+            themeIcon.className = 'bi bi-sun';
+        } else {
+            document.body.classList.remove('dark-mode');
+            themeIcon.className = 'bi bi-moon';
+        }
+        localStorage.setItem('theme', theme);
+    }
+    
+    // 初始化主题
+    setTheme(getTheme());
+    
+    // 切换主题
+    if (themeToggle) {
+        themeToggle.addEventListener('click', () => {
+            const current = getTheme();
+            setTheme(current === 'light' ? 'dark' : 'light');
         });
     }
     </script>

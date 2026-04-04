@@ -15,6 +15,20 @@ body {
 </style>
 {% endif %}
 
+<style>
+body.dark-mode .card {
+    background: rgba(22, 33, 62, 0.95) !important;
+}
+body.dark-mode .form-control {
+    background: #2d2d44 !important;
+    border-color: #3d3d5c !important;
+    color: #e0e0e0 !important;
+}
+body.dark-mode .form-label {
+    color: #e0e0e0 !important;
+}
+</style>
+
 <div class="container">
     <div class="row justify-content-center align-items-center" style="min-height: 100vh;">
         <div class="col-md-4">
@@ -46,4 +60,12 @@ body {
         </div>
     </div>
 </div>
+
+<script>
+// 初始化日夜模式（从localStorage读取）
+const theme = localStorage.getItem('theme') || 'light';
+if (theme === 'dark') {
+    document.body.classList.add('dark-mode');
+}
+</script>
 {% endblock %}
