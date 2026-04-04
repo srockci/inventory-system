@@ -545,6 +545,26 @@
         }
     });
     </script>
+
+    <!-- Toast 提示组件 -->
+    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 9999;">
+        <div id="toast-message" class="toast" role="alert">
+            <div class="toast-body"></div>
+        </div>
+    </div>
+    
+    <script>
+    function showToast(message, isSuccess) {
+        const toast = document.getElementById("toast-message");
+        if (isSuccess) {
+            toast.innerHTML = '<span class="text-success"><i class="bi bi-check-circle"></i> ' + message + '</span>';
+        } else {
+            toast.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle"></i> ' + message + '</span>';
+        }
+        toast.classList.add("show");
+        setTimeout(() => toast.classList.remove("show"), 3000);
+    }
+    </script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>

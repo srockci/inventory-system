@@ -137,24 +137,10 @@
 </div>
 
 <!-- Toast 提示 -->
-<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 9999;">
-    <div id="toast-result" class="toast" role="alert">
-        <div class="toast-body"></div>
-    </div>
-</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-function showToast(message, isSuccess) {
-    const toast = document.getElementById('toast-result');
-    toast.querySelector('.toast-body').innerHTML = isSuccess 
-        ? '<span class="text-success"><i class="bi bi-check-circle"></i> ' + message + '</span>'
-        : '<span class="text-danger"><i class="bi bi-x-circle"></i> ' + message + '</span>';
-    toast.classList.add('show');
-    setTimeout(() => toast.classList.remove('show'), 3000);
-}
-
 // 基本设置
 document.querySelector('#basic-settings-form').addEventListener('submit', async (e) => {
     e.preventDefault();

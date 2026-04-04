@@ -1,6 +1,33 @@
 {% extends "base.html" %}
 
-{% block title %}分类管理{% endblock %}
+{% block title %}分类管理{% block extra_js %}
+<script>
+document.querySelector('#add-category-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const btn = document.getElementById('add-btn');
+    const formData = new FormData();
+    formData.append('name', e.target.querySelector('input[name="name"]').value);
+    
+    try {
+        const res = await fetch('{{ url_for("add_category") }}', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (res.redirected || res.ok) {
+            showToast('添加成功', true);
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            showToast('添加失败', false);
+        }
+    } catch (err) {
+        showToast('操作失败: ' + err.message, false);
+    }
+});
+</script>
+{% endblock %}
+{% endblock %}
 
 {% block content %}
 <h4 class="mb-4"><i class="bi bi-folder"></i> 分类管理</h4>
@@ -12,10 +39,10 @@
                 <i class="bi bi-plus-circle"></i> 添加分类
             </div>
             <div class="card-body">
-                <form method="POST" action="{{ url_for('add_category') }}">
+                <form id="add-category-form">
                     <div class="input-group">
                         <input type="text" name="name" class="form-control" placeholder="分类名称" required>
-                        <button type="submit" class="btn btn-primary">添加</button>
+                        <button type="submit" class="btn btn-primary" id="add-btn">添加</button>
                     </div>
                 </form>
             </div>
@@ -62,4 +89,31 @@
         </div>
     </div>
 </div>
+{% block extra_js %}
+<script>
+document.querySelector('#add-category-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const btn = document.getElementById('add-btn');
+    const formData = new FormData();
+    formData.append('name', e.target.querySelector('input[name="name"]').value);
+    
+    try {
+        const res = await fetch('{{ url_for("add_category") }}', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (res.redirected || res.ok) {
+            showToast('添加成功', true);
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            showToast('添加失败', false);
+        }
+    } catch (err) {
+        showToast('操作失败: ' + err.message, false);
+    }
+});
+</script>
+{% endblock %}
 {% endblock %}
