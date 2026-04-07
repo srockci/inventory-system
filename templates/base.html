@@ -348,13 +348,6 @@
 
         
         <!-- 商品 -->
-        <!-- 项目选择器 -->
-        <div class="p-2 border-bottom border-secondary">
-            <select id="project-selector" class="form-select form-select-sm" style="background-color: #2c2c2c; color: #fff; border-color: #444;">
-                <option value="">加载中...</option>
-            </select>
-        </div>
-        
         <div class="menu-category">商品</div>
         <a href="{{ url_for('stock_in_page') }}" class="{% if request.endpoint == 'stock_in_page' %}active{% endif %}">
             <i class="bi bi-arrow-down-circle"></i> 入库
@@ -432,6 +425,18 @@
         <!-- 右侧：图标 -->
         <div class="toolbar-right">
             <div class="d-flex gap-2 align-items-center">
+                <!-- 项目切换 -->
+                <div class="dropdown">
+                    <button class="btn btn-link text-muted p-1" data-bs-toggle="dropdown" title="切换项目" id="project-btn">
+                        <i class="bi bi-folder" style="font-size: 1.3rem;"></i>
+                        <span id="current-project-name" class="ms-1" style="font-size: 0.85rem;">加载中...</span>
+                        <i class="bi bi-caret-down-fill" style="font-size: 0.7rem;"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end" id="project-dropdown" style="max-height: 300px; overflow-y: auto;">
+                        <li><span class="dropdown-item-text text-muted">加载中...</span></li>
+                    </ul>
+                </div>
+                
                 <!-- 日夜切换 -->
                 <div class="dropdown">
                     <button class="btn btn-link text-muted p-1" data-bs-toggle="dropdown" title="切换主题" id="theme-btn">
@@ -579,43 +584,48 @@
     }
     </script>
     <script>
-    // 加载项目列表
-    async function loadProjects() {
+    // 加载当前项目
+    async function loadCurrentProject() {
         try {
             const res = await fetch('{{ url_for("get_current_project") }}');
             const data = await res.json();
             
-            const selector = document.getElementById('project-selector');
-            selector.innerHTML = '';
-            
+            const nameEl = document.getElementById('current-project-name');
             if (!data.success) {
-                selector.innerHTML = '<option value="">无可用项目</option>';
+                nameEl.textContent = '无可用项目';
                 return;
             }
             
-            // 获取所有项目
+            nameEl.textContent = data.project_name;
+            
+            // 获取所有可访问项目
             const res2 = await fetch('/api/projects');
-            // 不存在这个端点，我们用当前项目作为唯一选项
-            const opt = document.createElement('option');
-            opt.value = data.project_id;
-            opt.textContent = data.project_name + ' (' + data.project_code + ')';
-            opt.selected = true;
-            selector.appendChild(opt);
+            const data2 = await res2.json();
+            
+            const dropdown = document.getElementById('project-dropdown');
+            dropdown.innerHTML = '';
+            
+            if (data2.success && data2.projects.length > 0) {
+                data2.projects.forEach(p => {
+                    const li = document.createElement('li');
+                    const isActive = p.id == data.project_id;
+                    li.innerHTML = '<a class="dropdown-item' + (isActive ? ' active' : '') + '" href="#" onclick="switchProject(' + p.id + ', \'' + p.name.replace(/'/g, "\\'") + '\'); return false;">' + p.name + ' <span class="badge bg-secondary">' + p.code + '</span>' + (isActive ? ' <i class="bi bi-check"></i>' : '') + '</a>';
+                    dropdown.appendChild(li);
+                });
+            } else {
+                dropdown.innerHTML = '<li><span class="dropdown-item-text text-muted">无可用项目</span></li>';
+            }
         } catch (err) {
             console.error('Failed to load projects:', err);
         }
     }
     
     // 切换项目
-    document.getElementById('project-selector').addEventListener('change', async (e) => {
-        const projectId = e.target.value;
-        if (!projectId) return;
-        
+    async function switchProject(projectId, projectName) {
         try {
             const res = await fetch('/api/switch-project/' + projectId, { method: 'POST' });
             const data = await res.json();
             if (data.success) {
-                // 刷新页面
                 window.location.reload();
             } else {
                 showToast(data.message, false);
@@ -623,10 +633,10 @@
         } catch (err) {
             showToast('切换失败', false);
         }
-    });
+    }
     
     // 页面加载时获取当前项目
-    document.addEventListener('DOMContentLoaded', loadProjects);
+    document.addEventListener('DOMContentLoaded', loadCurrentProject);
     </script>
     {% block extra_js %}{% endblock %}
 </body>
