@@ -316,9 +316,8 @@
         <a href="{{ url_for('index') }}">
             <span class="h5 mb-0">
                 {% if g.system_logo %}
-                <img src="{{ url_for('static', filename='uploads/' + g.system_logo) }}" alt="logo" style="height: 24px; margin-right: 8px;">
+                <img src="{{ url_for('static', filename='uploads/' + g.system_logo) }}" alt="logo" style="height: 24px; ">
                 {% endif %}
-                {{ g.system_name }}
             </span>
         </a>
         <span></span>
@@ -333,11 +332,10 @@
             <a href="{{ url_for('index') }}">
                 <h5 class="mb-0">
                     {% if g.system_logo %}
-                    <img src="{{ url_for('static', filename='uploads/' + g.system_logo) }}" alt="logo" style="height: 24px; margin-right: 8px;">
+                    <img src="{{ url_for('static', filename='uploads/' + g.system_logo) }}" alt="logo" style="height: 24px; ">
                     {% else %}
                     <i class="bi bi-box-seam"></i>
                     {% endif %}
-                    {{ g.system_name }}
                 </h5>
             </a>
             <button class="btn btn-link text-white p-0 d-md-none" id="menu-close">
@@ -415,7 +413,7 @@
         <!-- 左侧：Logo -->
         <div class="toolbar-left">
             {% if g.system_logo %}
-            <img src="{{ url_for('static', filename='uploads/' + g.system_logo) }}" alt="logo" style="height: 24px; margin-right: 8px;">
+            <img src="{{ url_for('static', filename='uploads/' + g.system_logo) }}" alt="logo" style="height: 24px; ">
             {% endif %}
         </div>
         <!-- 中间：项目名称 -->
