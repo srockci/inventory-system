@@ -39,8 +39,14 @@ def inject_settings():
             g.current_project = project
         else:
             g.current_project = None
+            session.pop('current_project_id', None)
     else:
         g.current_project = None
+        # 自动选择第一个项目
+        first_project = Project.query.filter_by(is_active=True).first()
+        if first_project:
+            session['current_project_id'] = first_project.id
+            g.current_project = first_project
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
