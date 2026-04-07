@@ -30,6 +30,17 @@ def inject_settings():
     g.system_name = SystemSettings.get('system_name', '物资管理系统')
     g.system_logo = SystemSettings.get('system_logo', '')
     g.login_background = SystemSettings.get('login_background', '')
+    
+    # 注入当前项目信息
+    project_id = session.get('current_project_id')
+    if project_id:
+        project = Project.query.get(project_id)
+        if project and project.is_active:
+            g.current_project = project
+        else:
+            g.current_project = None
+    else:
+        g.current_project = None
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS

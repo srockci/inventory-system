@@ -418,9 +418,9 @@
             <img src="{{ url_for('static', filename='uploads/' + g.system_logo) }}" alt="logo" style="height: 24px; margin-right: 8px;">
             {% endif %}
         </div>
-        <!-- 中间：系统名称 -->
+        <!-- 中间：项目名称 -->
         <div class="toolbar-center">
-            <span class="system-title">{{ g.system_name }}</span>
+            <span class="system-title">{% if g.current_project %}{{ g.current_project.name }}{% else %}{{ g.system_name }}{% endif %}</span>
         </div>
         <!-- 右侧：图标 -->
         <div class="toolbar-right">
