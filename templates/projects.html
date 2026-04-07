@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
-{% block title %}项目管理{% endblock %}
+{% block title %}项目管理
+{% endblock %}
 
 {% block content %}
 <h4 class="mb-4"><i class="bi bi-folder"></i> 项目管理</h4>
@@ -77,7 +78,7 @@
                                 <td>{{ project.products|length }}</td>
                                 <td>
                                     <div class="btn-group btn-group-sm">
-                                        <button class="btn btn-outline-primary" onclick="editProject({{ project.id }}, '{{ project.name }}', '{{ project.code }}', `{{ project.description or '' }}`, {{ project.is_active|lower }}, '{{ project.logo or '' }}')">
+                                        <button class="btn btn-outline-primary btn-edit" data-id="{{ project.id }}" data-name="{{ project.name }}" data-code="{{ project.code }}" data-desc="{{ project.description or '' }}" data-active="{{ project.is_active|lower }}" data-logo="{{ project.logo or '' }}">
                                             <i class="bi bi-pencil"></i>
                                         </button>
                                         <button class="btn btn-outline-info" onclick="manageUsers({{ project.id }})">
@@ -103,6 +104,7 @@
         </div>
     </div>
 </div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -137,16 +139,18 @@ document.querySelector('#add-project-form').addEventListener('submit', async (e)
 
 // 编辑项目 - 使用模态框
 let currentEditId = null;
-async function editProject(id, name, code, description, isActive, logo) {
-    currentEditId = id;
-    document.getElementById('edit-id').value = id;
-    document.getElementById('edit-name').value = name;
-    document.getElementById('edit-code').value = code;
-    document.getElementById('edit-desc').value = description;
-    document.getElementById('edit-active').checked = isActive;
-    document.getElementById('edit-logo-preview').innerHTML = logo ? `<img src="/static/uploads/${logo}" style="height:40px;">` : '';
-    new bootstrap.Modal(document.getElementById('editModal')).show();
-}
+document.querySelectorAll('.btn-edit').forEach(btn => {
+    btn.addEventListener('click', () => {
+        currentEditId = btn.dataset.id;
+        document.getElementById('edit-id').value = btn.dataset.id;
+        document.getElementById('edit-name').value = btn.dataset.name;
+        document.getElementById('edit-code').value = btn.dataset.code;
+        document.getElementById('edit-desc').value = btn.dataset.desc;
+        document.getElementById('edit-active').checked = btn.dataset.active === 'True';
+        document.getElementById('edit-logo-preview').innerHTML = btn.dataset.logo ? `<img src="/static/uploads/${btn.dataset.logo}" style="height:40px;">` : '';
+        new bootstrap.Modal(document.getElementById('editModal')).show();
+    });
+});
 
 document.querySelector('#edit-project-form').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -238,4 +242,5 @@ function manageUsers(projectId) {
     window.location.href = `/project/${projectId}/users`;
 }
 </script>
+
 {% endblock %}
