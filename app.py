@@ -54,10 +54,20 @@ class User(db.Model):
     role = db.Column(db.String(50), default='user')  # 角色名称
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+class Project(db.Model):
+    """项目表"""
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    code = db.Column(db.String(50), unique=True, nullable=False)  # 项目代码
+    description = db.Column(db.Text)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
 class Category(db.Model):
     """分类表"""
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=True)  # 分类属于项目
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class SystemSettings(db.Model):
@@ -84,6 +94,7 @@ class SystemSettings(db.Model):
 class Product(db.Model):
     """商品表"""
     id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False)  # 所属项目
     code = db.Column(db.String(50), unique=True, nullable=False)  # 商品编码（扫码用）
     name = db.Column(db.String(200), nullable=False)
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'))
@@ -96,6 +107,7 @@ class Product(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    project = db.relationship('Project', backref='products')
     category = db.relationship('Category', backref='products')
 
 class StockIn(db.Model):
@@ -769,6 +781,279 @@ def roles():
         role['user_count'] = sum(1 for u in users if u.role == role['name'])
     return render_template('roles.html', roles=roles_list)
 
+
+
+# ============ 项目管理 ============
+@app.route('/projects')
+@login_required
+def projects():
+    """项目管理"""
+    if session.get('role') != 'admin':
+        return '无权限', 403
+    
+    # 获取用户管理的项目
+    role = session.get('role', 'user')
+    roles = get_roles()
+    is_admin = any(r['name'] == role and r.get('is_admin', False) for r in roles)
+    
+    if is_admin:
+        projects_list = Project.query.order_by(Project.created_at.desc()).all()
+    else:
+        # 普通用户只看有权限的项目
+        from sqlalchemy import text
+        user_project_ids = db.session.execute(
+            text("SELECT project_id FROM user_project_roles WHERE username = :username"),
+            {"username": session.get('username')}
+        ).fetchall()
+        projects_list = Project.query.filter(
+            Project.id.in_([r[0] for r in user_project_ids]),
+            Project.is_active == True
+        ).all() if user_project_ids else []
+    
+    return render_template('projects.html', projects=projects_list)
+
+@app.route('/project/add', methods=['POST'])
+@login_required
+def add_project():
+    """添加项目"""
+    if session.get('role') != 'admin':
+        return jsonify({'success': False, 'message': '无权限'})
+    
+    name = request.form.get('name', '').strip()
+    code = request.form.get('code', '').strip().upper()
+    description = request.form.get('description', '').strip()
+    
+    if not name or not code:
+        return jsonify({'success': False, 'message': '项目名称和代码不能为空'})
+    
+    # 检查代码唯一性
+    if Project.query.filter_by(code=code).first():
+        return jsonify({'success': False, 'message': '项目代码已存在'})
+    
+    project = Project(name=name, code=code, description=description)
+    db.session.add(project)
+    db.session.commit()
+    
+    return jsonify({'success': True, 'message': f'项目 "{name}" 创建成功'})
+
+@app.route('/project/<int:project_id>/edit', methods=['POST'])
+@login_required
+def edit_project(project_id):
+    """编辑项目"""
+    if session.get('role') != 'admin':
+        return jsonify({'success': False, 'message': '无权限'})
+    
+    project = Project.query.get_or_404(project_id)
+    
+    name = request.form.get('name', '').strip()
+    code = request.form.get('code', '').strip().upper()
+    description = request.form.get('description', '').strip()
+    is_active = request.form.get('is_active') == 'on'
+    
+    # 检查代码唯一性（排除自己）
+    if Project.query.filter(Project.code == code, Project.id != project_id).first():
+        return jsonify({'success': False, 'message': '项目代码已存在'})
+    
+    project.name = name
+    project.code = code
+    project.description = description
+    project.is_active = is_active
+    db.session.commit()
+    
+    return jsonify({'success': True, 'message': '项目已更新'})
+
+@app.route('/project/<int:project_id>/delete', methods=['POST'])
+@login_required
+def delete_project(project_id):
+    """删除项目"""
+    if session.get('role') != 'admin':
+        return jsonify({'success': False, 'message': '无权限'})
+    
+    project = Project.query.get_or_404(project_id)
+    
+    # 检查是否有商品
+    if Product.query.filter_by(project_id=project_id).first():
+        return jsonify({'success': False, 'message': '该项目下有商品，请先转移或删除'})
+    
+    db.session.delete(project)
+    db.session.commit()
+    
+    return jsonify({'success': True, 'message': '项目已删除'})
+
+@app.route('/project/<int:project_id>/users')
+@login_required
+def project_users(project_id):
+    """项目用户管理"""
+    if session.get('role') != 'admin':
+        return '无权限', 403
+    
+    project = Project.query.get_or_404(project_id)
+    users = User.query.all()
+    roles = get_roles()
+    
+    # 获取项目用户和角色
+    from sqlalchemy import text
+    user_roles = db.session.execute(
+        text("SELECT username, role FROM user_project_roles WHERE project_id = :project_id"),
+        {"project_id": project_id}
+    ).fetchall()
+    user_role_dict = {ur[0]: ur[1] for ur in user_roles}
+    
+    return render_template('project_users.html', project=project, users=users, roles=roles, user_role_dict=user_role_dict)
+
+@app.route('/project/<int:project_id>/user/add', methods=['POST'])
+@login_required
+def add_project_user(project_id):
+    """添加项目用户"""
+    if session.get('role') != 'admin':
+        return jsonify({'success': False, 'message': '无权限'})
+    
+    username = request.form.get('username', '').strip()
+    role = request.form.get('role', 'viewer').strip()
+    
+    if not username:
+        return jsonify({'success': False, 'message': '请选择用户'})
+    
+    # 检查用户是否存在
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        return jsonify({'success': False, 'message': '用户不存在'})
+    
+    from sqlalchemy import text
+    # 检查是否已添加
+    existing = db.session.execute(
+        text("SELECT 1 FROM user_project_roles WHERE project_id = :project_id AND username = :username"),
+        {"project_id": project_id, "username": username}
+    ).fetchone()
+    
+    if existing:
+        # 更新角色
+        db.session.execute(
+            text("UPDATE user_project_roles SET role = :role WHERE project_id = :project_id AND username = :username"),
+            {"project_id": project_id, "username": username, "role": role}
+        )
+    else:
+        db.session.execute(
+            text("INSERT INTO user_project_roles (project_id, username, role) VALUES (:project_id, :username, :role)"),
+            {"project_id": project_id, "username": username, "role": role}
+        )
+    
+    db.session.commit()
+    return jsonify({'success': True, 'message': f'已添加用户 "{username}" 到项目'})
+
+@app.route('/project/<int:project_id>/user/<username>/remove', methods=['POST'])
+@login_required
+def remove_project_user(project_id, username):
+    """移除项目用户"""
+    if session.get('role') != 'admin':
+        return jsonify({'success': False, 'message': '无权限'})
+    
+    from sqlalchemy import text
+    db.session.execute(
+        text("DELETE FROM user_project_roles WHERE project_id = :project_id AND username = :username"),
+        {"project_id": project_id, "username": username}
+    )
+    db.session.commit()
+    
+    return jsonify({'success': True, 'message': f'已移除用户 "{username}"'})
+
+@app.route('/api/current-project', methods=['GET'])
+@login_required
+def get_current_project():
+    """获取当前项目"""
+    project_id = session.get('current_project_id')
+    if project_id:
+        project = Project.query.get(project_id)
+        if project and project.is_active:
+            return jsonify({'success': True, 'project_id': project_id, 'project_name': project.name, 'project_code': project.code})
+    
+    # 如果没有或无效，返回第一个有权限的项目
+    username = session.get('username')
+    from sqlalchemy import text
+    
+    # 管理员看所有项目
+    role = session.get('role')
+    roles_data = get_roles()
+    is_admin = any(r['name'] == role and r.get('is_admin', False) for r in roles_data)
+    
+    if is_admin:
+        project = Project.query.filter_by(is_active=True).first()
+    else:
+        result = db.session.execute(
+            text("SELECT p.id, p.name, p.code FROM projects p JOIN user_project_roles upr ON p.id = upr.project_id WHERE upr.username = :username AND p.is_active = 1 LIMIT 1"),
+            {"username": username}
+        ).fetchone()
+        project = Project.query.get(result[0]) if result else None
+    
+    if project:
+        session['current_project_id'] = project.id
+        return jsonify({'success': True, 'project_id': project.id, 'project_name': project.name, 'project_code': project.code})
+    
+    return jsonify({'success': False, 'message': '没有可用的项目'})
+
+@app.route('/api/projects', methods=['GET'])
+@login_required
+def list_projects():
+    """获取所有可访问项目"""
+    username = session.get('username')
+    role = session.get('role')
+    
+    roles_data = get_roles()
+    is_admin = any(r['name'] == role and r.get('is_admin', False) for r in roles_data)
+    
+    if is_admin:
+        projects = Project.query.filter_by(is_active=True).all()
+    else:
+        from sqlalchemy import text
+        result = db.session.execute(
+            text("SELECT p.id, p.name, p.code FROM projects p JOIN user_project_roles upr ON p.id = upr.project_id WHERE upr.username = :username AND p.is_active = 1"),
+            {"username": username}
+        ).fetchall()
+        projects = [Project(id=r[0], name=r[1], code=r[2]) for r in result]
+    
+    return jsonify({
+        'success': True,
+        'projects': [{'id': p.id, 'name': p.name, 'code': p.code} for p in projects]
+    })
+
+@app.route('/api/switch-project/<int:project_id>', methods=['POST'])
+@login_required
+def switch_project(project_id):
+    """切换当前项目"""
+    username = session.get('username')
+    role = session.get('role')
+    
+    # 检查权限
+    roles_data = get_roles()
+    is_admin = any(r['name'] == role and r.get('is_admin', False) for r in roles_data)
+    
+    if not is_admin:
+        from sqlalchemy import text
+        has_access = db.session.execute(
+            text("SELECT 1 FROM user_project_roles WHERE project_id = :project_id AND username = :username"),
+            {"project_id": project_id, "username": username}
+        ).fetchone()
+        if not has_access:
+            return jsonify({'success': False, 'message': '无权访问此项目'})
+    
+    project = Project.query.get(project_id)
+    if not project or not project.is_active:
+        return jsonify({'success': False, 'message': '项目不存在或已停用'})
+    
+    session['current_project_id'] = project_id
+    return jsonify({'success': True, 'message': f'已切换到项目 "{project.name}"'})
+
+@app.template_filter('get_user_project_role')
+def get_user_project_role(project_id, username):
+    """获取用户在项目中的角色"""
+    from sqlalchemy import text
+    result = db.session.execute(
+        text("SELECT role FROM user_project_roles WHERE project_id = :project_id AND username = :username"),
+        {"project_id": project_id, "username": username}
+    ).fetchone()
+    return result[0] if result else None
+
+
 @app.route('/role/add', methods=['POST'])
 @login_required
 def add_role():
@@ -1014,6 +1299,32 @@ def init_db():
                 'admin': {k: True for k in ['stock_in', 'stock_out', 'stock_check', 'products_view', 'products_edit', 'products_delete', 'categories_edit', 'users_view', 'users_edit', 'settings_view', 'settings_edit', 'reports_view']},
                 'user': {'stock_in': True, 'stock_out': True, 'stock_check': True, 'products_view': True, 'products_edit': False, 'products_delete': False, 'categories_edit': False, 'users_view': False, 'users_edit': False, 'settings_view': False, 'settings_edit': False, 'reports_view': True}
             }))
+        
+        # 创建默认项目
+        if Project.query.count() == 0:
+            default_project = Project(
+                name='默认项目',
+                code='DEFAULT',
+                description='系统默认项目'
+            )
+            db.session.add(default_project)
+        
+        # 创建 user_project_roles 表
+        from sqlalchemy import text
+        try:
+            db.session.execute(text("""
+                CREATE TABLE IF NOT EXISTS user_project_roles (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    project_id INTEGER NOT NULL,
+                    username VARCHAR(50) NOT NULL,
+                    role VARCHAR(50) DEFAULT 'viewer',
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (project_id) REFERENCES project(id),
+                    UNIQUE(project_id, username)
+                )
+            """))
+        except Exception:
+            pass
         
         db.session.commit()
         print('数据库初始化完成')

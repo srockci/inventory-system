@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+
+{% block title %}项目管理{% endblock %}
+
+{% block content %}
+<h4 class="mb-4"><i class="bi bi-folder"></i> 项目管理</h4>
+
+<div class="row g-4">
+    <!-- 添加项目 -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-plus-circle"></i> 添加项目
+            </div>
+            <div class="card-body">
+                <form id="add-project-form">
+                    <div class="mb-3">
+                        <label class="form-label">项目名称</label>
+                        <input type="text" name="name" id="project-name" class="form-control" placeholder="如：项目A" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">项目代码</label>
+                        <input type="text" name="code" id="project-code" class="form-control" placeholder="如：PROJ-A" required>
+                        <small class="text-muted">唯一标识符，建议大写</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">描述</label>
+                        <textarea name="description" id="project-desc" class="form-control" rows="2"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-plus-circle"></i> 创建项目
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 项目列表 -->
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-list"></i> 项目列表
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>代码</th>
+                                <th>名称</th>
+                                <th>描述</th>
+                                <th>状态</th>
+                                <th>商品数</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for project in projects %}
+                            <tr>
+                                <td><strong>{{ project.code }}</strong></td>
+                                <td>{{ project.name }}</td>
+                                <td><small>{{ project.description or '-' }}</small></td>
+                                <td>
+                                    {% if project.is_active %}
+                                    <span class="badge bg-success">启用</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">停用</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ project.products|length }}</td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-primary" onclick="editProject({{ project.id }}, '{{ project.name }}', '{{ project.code }}', `{{ project.description or '' }}`, {{ project.is_active|lower }})">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button class="btn btn-outline-info" onclick="manageUsers({{ project.id }})">
+                                            <i class="bi bi-people"></i>
+                                        </button>
+                                        <button class="btn btn-outline-danger" onclick="deleteProject({{ project.id }}, '{{ project.name }}')">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if not projects %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-folder-x" style="font-size: 3rem;"></i>
+                    <p class="mt-2">暂无项目</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// 添加项目
+document.querySelector('#add-project-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const formData = new FormData();
+    formData.append('name', document.getElementById('project-name').value);
+    formData.append('code', document.getElementById('project-code').value);
+    formData.append('description', document.getElementById('project-desc').value);
+    
+    try {
+        const res = await fetch('{{ url_for("add_project") }}', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        showToast(data.message, data.success);
+        if (data.success) {
+            setTimeout(() => window.location.reload(), 1000);
+        }
+    } catch (err) {
+        showToast('添加失败: ' + err.message, false);
+    }
+});
+
+// 编辑项目
+async function editProject(id, name, code, description, isActive) {
+    const formData = new FormData();
+    formData.append('name', prompt('项目名称', name) || name);
+    formData.append('code', prompt('项目代码', code) || code);
+    formData.append('description', prompt('描述', description) || description);
+    formData.append('is_active', isActive ? 'on' : '');
+    
+    try {
+        const res = await fetch(`/project/${id}/edit`, {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        showToast(data.message, data.success);
+        if (data.success) {
+            setTimeout(() => window.location.reload(), 1000);
+        }
+    } catch (err) {
+        showToast('编辑失败', false);
+    }
+}
+
+// 删除项目
+async function deleteProject(id, name) {
+    if (!confirm(`确定删除项目 "${name}"？\\n删除后无法恢复！`)) return;
+    
+    try {
+        const res = await fetch(`/project/${id}/delete`, { method: 'POST' });
+        const data = await res.json();
+        showToast(data.message, data.success);
+        if (data.success) {
+            setTimeout(() => window.location.reload(), 1000);
+        }
+    } catch (err) {
+        showToast('删除失败', false);
+    }
+}
+
+// 管理项目用户
+function manageUsers(projectId) {
+    window.location.href = `/project/${projectId}/users`;
+}
+</script>
+{% endblock %}

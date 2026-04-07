@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}项目用户 - {{ project.name }}{% endblock %}
+
+{% block content %}
+<h4 class="mb-4">
+    <a href="{{ url_for('projects') }}" class="text-decoration-none"><i class="bi bi-arrow-left"></i></a>
+    <i class="bi bi-folder"></i> {{ project.name }} ({{ project.code }}) - 用户权限
+</h4>
+
+<div class="row g-4">
+    <!-- 添加用户 -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-person-plus"></i> 添加用户
+            </div>
+            <div class="card-body">
+                <form id="add-user-form">
+                    <input type="hidden" name="project_id" value="{{ project.id }}">
+                    <div class="mb-3">
+                        <label class="form-label">选择用户</label>
+                        <select name="username" id="user-select" class="form-select" required>
+                            <option value="">-- 请选择 --</option>
+                            {% for user in users %}
+                            <option value="{{ user.username }}">{{ user.username }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">项目角色</label>
+                        <select name="role" id="role-select" class="form-select">
+                            <option value="viewer">查看者</option>
+                            <option value="operator">操作员</option>
+                            <option value="manager">管理员</option>
+                        </select>
+                        <small class="text-muted">
+                            <br>查看者：仅查看数据
+                            <br>操作员：入库/出库/盘点
+                            <br>管理员：全部权限
+                        </small>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-plus-circle"></i> 添加
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 用户列表 -->
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-people"></i> 项目用户 ({{ user_role_dict|length }})
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>用户名</th>
+                                <th>项目角色</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for username, role in user_role_dict.items() %}
+                            <tr>
+                                <td><strong>{{ username }}</strong></td>
+                                <td>
+                                    <span class="badge {% if role == 'manager' %}bg-danger{% elif role == 'operator' %}bg-primary{% else %}bg-secondary{% endif %}">
+                                        {% if role == 'manager' %}管理员{% elif role == 'operator' %}操作员{% else %}查看者{% endif %}
+                                    </span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-danger" onclick="removeUser('{{ username }}')">
+                                        <i class="bi bi-person-dash"></i> 移除
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if not user_role_dict %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-people" style="font-size: 3rem;"></i>
+                    <p class="mt-2">暂无用户</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelector('#add-user-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const formData = new FormData(e.target);
+    
+    try {
+        const res = await fetch('{{ url_for("add_project_user", project_id=project.id) }}', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        showToast(data.message, data.success);
+        if (data.success) {
+            setTimeout(() => window.location.reload(), 1000);
+        }
+    } catch (err) {
+        showToast('添加失败: ' + err.message, false);
+    }
+});
+
+async function removeUser(username) {
+    if (!confirm(`确定从项目中移除用户 "${username}"？`)) return;
+    
+    try {
+        const res = await fetch('{{ url_for("remove_project_user", project_id=project.id, username="") }}' + username, {
+            method: 'POST'
+        });
+        const data = await res.json();
+        showToast(data.message, data.success);
+        if (data.success) {
+            setTimeout(() => window.location.reload(), 1000);
+        }
+    } catch (err) {
+        showToast('移除失败', false);
+    }
+}
+</script>
+{% endblock %}
