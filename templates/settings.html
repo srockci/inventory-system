@@ -8,7 +8,7 @@
 <div class="row g-4">
     <!-- 基本设置 -->
     <div class="col-md-6">
-        <div class="card">
+        <div class="card settings-card">
             <div class="card-header">
                 <i class="bi bi-info-circle"></i> 基本设置
             </div>
@@ -29,7 +29,7 @@
     
     <!-- Logo设置 -->
     <div class="col-md-6">
-        <div class="card">
+        <div class="card settings-card">
             <div class="card-header">
                 <i class="bi bi-image"></i> Logo 设置
             </div>
@@ -70,7 +70,7 @@
     
     <!-- 登录页背景设置 -->
     <div class="col-md-6">
-        <div class="card">
+        <div class="card settings-card">
             <div class="card-header">
                 <i class="bi bi-image-fill"></i> 登录页背景
             </div>
@@ -110,7 +110,7 @@
     
     <!-- 预览 -->
     <div class="col-md-6">
-        <div class="card">
+        <div class="card settings-card">
             <div class="card-header">
                 <i class="bi bi-eye"></i> 登录页预览
             </div>
@@ -142,6 +142,16 @@
 {% endblock %}
 
 {% block extra_js %}
+<style>
+.settings-card {
+    height: 100%;
+}
+.settings-card .card-body {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+</style>
 <script>
 // 基本设置保存
 document.querySelector('#basic-settings-form').addEventListener('submit', async (e) => {
