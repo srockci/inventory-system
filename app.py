@@ -641,10 +641,8 @@ def update_settings():
         return jsonify({'success': False, 'message': '无权限'})
     
     system_name = request.form.get('system_name', '')
-    login_background_url = request.form.get('login_background_url', '')
     
     SystemSettings.set('system_name', system_name)
-    SystemSettings.set('login_background', login_background_url)
     
     return jsonify({'success': True, 'message': '设置已保存'})
 
