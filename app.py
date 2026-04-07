@@ -1006,7 +1006,7 @@ def init_db():
         if SystemSettings.get('roles') == '':
             import json
             SystemSettings.set('roles', json.dumps([
-                {'Name': 'admin', 'is_admin': True, 'user_count': 0},
+                {'name': 'admin', 'is_admin': True, 'user_count': 0},
                 {'name': 'user', 'is_admin': False, 'user_count': 0}
             ]))
             # 创建默认权限
