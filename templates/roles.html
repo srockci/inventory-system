@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block title %}角色管理{% endblock %}
+
+{% block content %}
+<h4 class="mb-4"><i class="bi bi-people"></i> 角色管理</h4>
+
+<div class="row g-4">
+    <!-- 添加角色 -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-person-plus"></i> 添加角色
+            </div>
+            <div class="card-body">
+                <form id="add-role-form">
+                    <div class="mb-3">
+                        <label class="form-label">角色名称</label>
+                        <input type="text" name="name" id="role-name" class="form-control" placeholder="如：库管员、财务" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-plus-circle"></i> 添加
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 角色列表 -->
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-list"></i> 角色列表
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>角色名称</th>
+                                <th>类型</th>
+                                <th>用户数</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for role in roles %}
+                            <tr>
+                                <td>
+                                    <strong>{{ role.name }}</strong>
+                                </td>
+                                <td>
+                                    {% if role.is_admin %}
+                                    <span class="badge bg-danger">系统管理员</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">普通角色</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ role.user_count }}</td>
+                                <td>
+                                    {% if role.name not in ['admin', 'user'] %}
+                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteRole('{{ role.name }}')">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                    {% else %}
+                                    <button class="btn btn-sm btn-outline-secondary" disabled>
+                                        <i class="bi bi-lock"></i>
+                                    </button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mt-4">
+    <a href="{{ url_for('permissions') }}" class="btn btn-primary">
+        <i class="bi bi-shield-lock"></i> 配置角色权限
+    </a>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelector('#add-role-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const name = document.getElementById('role-name').value.trim();
+    if (!name) {
+        showToast('请输入角色名称', false);
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('name', name);
+    
+    try {
+        const res = await fetch('{{ url_for("add_role") }}', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+            showToast(data.message, true);
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            showToast(data.message, false);
+        }
+    } catch (err) {
+        showToast('操作失败: ' + err.message, false);
+    }
+});
+
+async function deleteRole(name) {
+    if (!confirm('确定删除角色 "' + name + '"？')) return;
+    
+    try {
+        const res = await fetch('/role/' + name + '/delete', {
+            method: 'POST'
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+            showToast(data.message, true);
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            showToast(data.message, false);
+        }
+    } catch (err) {
+        showToast('操作失败', false);
+    }
+}
+</script>
+{% endblock %}

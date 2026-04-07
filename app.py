@@ -51,7 +51,7 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True, nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
-    role = db.Column(db.String(20), default='user')  # admin, user
+    role = db.Column(db.String(50), default='user')  # 角色名称
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Category(db.Model):
@@ -667,35 +667,20 @@ def reset_background():
 # ---- 权限管理 ----
 
 # 默认权限配置
+# 默认权限配置
 DEFAULT_PERMISSIONS = {
-    'user': {
-        'stock_in': True,
-        'stock_out': True,
-        'stock_check': True,
-        'products_view': True,
-        'products_edit': False,
-        'products_delete': False,
-        'categories_edit': False,
-        'users_view': False,
-        'users_edit': False,
-        'settings_view': False,
-        'settings_edit': False,
-        'reports_view': True,
-    },
-    'admin': {
-        'stock_in': True,
-        'stock_out': True,
-        'stock_check': True,
-        'products_view': True,
-        'products_edit': True,
-        'products_delete': True,
-        'categories_edit': True,
-        'users_view': True,
-        'users_edit': True,
-        'settings_view': True,
-        'settings_edit': True,
-        'reports_view': True,
-    }
+    'stock_in': True,
+    'stock_out': True,
+    'stock_check': True,
+    'products_view': True,
+    'products_edit': False,
+    'products_delete': False,
+    'categories_edit': False,
+    'users_view': False,
+    'users_edit': False,
+    'settings_view': False,
+    'settings_edit': False,
+    'reports_view': True,
 }
 
 PERMISSION_LABELS = {
@@ -720,6 +705,113 @@ PERMISSION_GROUPS = {
     '报表': ['reports_view'],
 }
 
+def get_roles():
+    """获取所有角色"""
+    roles_data = SystemSettings.get('roles', '')
+    if roles_data:
+        import json
+        return json.loads(roles_data)
+    # 默认角色
+    return [
+        {'name': 'admin', 'is_admin': True},
+        {'name': 'user', 'is_admin': False}
+    ]
+
+def save_roles(roles):
+    """保存角色列表"""
+    import json
+    SystemSettings.set('roles', json.dumps(roles))
+
+def get_permissions(role_name):
+    """获取角色的权限"""
+    all_perms = SystemSettings.get('permissions', '')
+    if all_perms:
+        import json
+        perms = json.loads(all_perms)
+        return perms.get(role_name, DEFAULT_PERMISSIONS.copy())
+    return DEFAULT_PERMISSIONS.copy()
+
+def save_permissions_for_role(role_name, perms):
+    """保存角色的权限"""
+    import json
+    all_perms = SystemSettings.get('permissions', '')
+    if all_perms:
+        perms_dict = json.loads(all_perms)
+    else:
+        perms_dict = {}
+    perms_dict[role_name] = perms
+    SystemSettings.set('permissions', json.dumps(perms_dict))
+
+def check_permission(perm_key):
+    """检查当前用户是否有某权限"""
+    import json
+    role = session.get('role', 'user')
+    perms = get_permissions(role)
+    
+    # 管理员拥有所有权限
+    roles = get_roles()
+    for r in roles:
+        if r['name'] == role and r.get('is_admin', False):
+            return True
+    
+    return perms.get(perm_key, False)
+
+@app.route('/roles')
+@login_required
+def roles():
+    """角色管理"""
+    if session.get('role') != 'admin':
+        return '无权限', 403
+    roles_list = get_roles()
+    # 计算每个角色的用户数
+    users = User.query.all()
+    for role in roles_list:
+        role['user_count'] = sum(1 for u in users if u.role == role['name'])
+    return render_template('roles.html', roles=roles_list)
+
+@app.route('/role/add', methods=['POST'])
+@login_required
+def add_role():
+    """添加角色"""
+    if session.get('role') != 'admin':
+        return jsonify({'success': False, 'message': '无权限'})
+    
+    name = request.form.get('name', '').strip()
+    if not name:
+        return jsonify({'success': False, 'message': '角色名称不能为空'})
+    
+    roles = get_roles()
+    if any(r['name'] == name for r in roles):
+        return jsonify({'success': False, 'message': '角色已存在'})
+    
+    roles.append({'name': name, 'is_admin': False})
+    save_roles(roles)
+    # 新角色默认使用默认权限
+    save_permissions_for_role(name, DEFAULT_PERMISSIONS.copy())
+    
+    return jsonify({'success': True, 'message': '角色添加成功'})
+
+@app.route('/role/<role_name>/delete', methods=['POST'])
+@login_required
+def delete_role(role_name):
+    """删除角色"""
+    if session.get('role') != 'admin':
+        return jsonify({'success': False, 'message': '无权限'})
+    
+    roles = get_roles()
+    # 不能删除 admin 和 user
+    if role_name in ['admin', 'user']:
+        return jsonify({'success': False, 'message': '不能删除内置角色'})
+    
+    # 检查是否有用户使用此角色
+    if User.query.filter_by(role=role_name).first():
+        return jsonify({'success': False, 'message': '有用户使用此角色，无法删除'})
+    
+    roles = [r for r in roles if r['name'] != role_name]
+    save_roles(roles)
+    
+    return jsonify({'success': True, 'message': '角色已删除'})
+
 @app.route('/permissions')
 @login_required
 def permissions():
@@ -727,16 +819,14 @@ def permissions():
     if session.get('role') != 'admin':
         return '无权限', 403
     
-    # 获取当前权限配置
-    permissions_config = SystemSettings.get('permissions', '')
-    if permissions_config:
-        import json
-        permissions = json.loads(permissions_config)
-    else:
-        permissions = DEFAULT_PERMISSIONS.copy()
+    roles_list = get_roles()
+    permissions_data = {}
+    for role in roles_list:
+        permissions_data[role['name']] = get_permissions(role['name'])
     
     return render_template('permissions.html', 
-                         permissions=permissions,
+                         roles=roles_list,
+                         permissions=permissions_data,
                          permission_labels=PERMISSION_LABELS,
                          permission_groups=PERMISSION_GROUPS)
 
@@ -748,25 +838,16 @@ def save_permissions():
         return jsonify({'success': False, 'message': '无权限'})
     
     import json
-    permissions = {}
-    for role in ['user', 'admin']:
-        permissions[role] = {}
+    roles = get_roles()
+    
+    for role in roles:
+        role_name = role['name']
+        perms = {}
         for perm_key in PERMISSION_LABELS.keys():
-            permissions[role][perm_key] = request.form.get(f'{role}_{perm_key}') == 'on'
+            perms[perm_key] = request.form.get(f'{role_name}_{perm_key}') == 'on'
+        save_permissions_for_role(role_name, perms)
     
-    SystemSettings.set('permissions', json.dumps(permissions))
     return jsonify({'success': True, 'message': '权限配置已保存'})
-
-@app.route('/permissions/reset', methods=['POST'])
-@login_required
-def reset_permissions():
-    """重置权限为默认"""
-    if session.get('role') != 'admin':
-        return jsonify({'success': False, 'message': '无权限'})
-    
-    import json
-    SystemSettings.set('permissions', json.dumps(DEFAULT_PERMISSIONS))
-    return jsonify({'success': True, 'message': '已重置为默认权限'})
 
 # ---- 用户管理 ----
 
@@ -920,6 +1001,19 @@ def init_db():
         # 创建默认系统设置
         if SystemSettings.get('system_name') == '':
             SystemSettings.set('system_name', '物资管理系统')
+        
+        # 创建默认角色
+        if SystemSettings.get('roles') == '':
+            import json
+            SystemSettings.set('roles', json.dumps([
+                {'Name': 'admin', 'is_admin': True, 'user_count': 0},
+                {'name': 'user', 'is_admin': False, 'user_count': 0}
+            ]))
+            # 创建默认权限
+            SystemSettings.set('permissions', json.dumps({
+                'admin': {k: True for k in ['stock_in', 'stock_out', 'stock_check', 'products_view', 'products_edit', 'products_delete', 'categories_edit', 'users_view', 'users_edit', 'settings_view', 'settings_edit', 'reports_view']},
+                'user': {'stock_in': True, 'stock_out': True, 'stock_check': True, 'products_view': True, 'products_edit': False, 'products_delete': False, 'categories_edit': False, 'users_view': False, 'users_edit': False, 'settings_view': False, 'settings_edit': False, 'reports_view': True}
+            }))
         
         db.session.commit()
         print('数据库初始化完成')
