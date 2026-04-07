@@ -847,7 +847,13 @@ def add_project():
     if Project.query.filter_by(code=code).first():
         return jsonify({'success': False, 'message': '项目代码已存在'})
     
-    project = Project(name=name, code=code, description=description)
+    logo = None
+    if 'logo' in request.files:
+        file = request.files['logo']
+        if file and file.filename and allowed_file(file.filename):
+            logo = upload_image(file)
+    
+    project = Project(name=name, code=code, description=description, logo=logo)
     db.session.add(project)
     db.session.commit()
     
@@ -875,6 +881,13 @@ def edit_project(project_id):
     project.code = code
     project.description = description
     project.is_active = is_active
+    
+    # 处理logo上传
+    if 'logo' in request.files:
+        file = request.files['logo']
+        if file and file.filename and allowed_file(file.filename):
+            project.logo = upload_image(file)
+    
     db.session.commit()
     
     return jsonify({'success': True, 'message': '项目已更新'})
