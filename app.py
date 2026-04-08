@@ -77,6 +77,7 @@ class Project(db.Model):
     name = db.Column(db.String(100), nullable=False)
     code = db.Column(db.String(50), unique=True, nullable=False)  # 项目代码
     description = db.Column(db.Text)
+    logo = db.Column(db.String(200))  # 项目Logo
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
