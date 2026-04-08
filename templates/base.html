@@ -33,18 +33,18 @@
         }
         .sidebar-header {
             padding: 12px 15px;
-            background: rgba(0,0,0,0.15);
-            border-bottom: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.95);
+            border-bottom: 1px solid rgba(0,0,0,0.08);
             display: flex;
             align-items: center;
             justify-content: space-between;
         }
         .sidebar-header a {
-            color: white;
+            color: #333;
             text-decoration: none;
         }
         .sidebar-header a:hover {
-            opacity: 0.8;
+            opacity: 0.7;
         }
         .sidebar a {
             color: rgba(255,255,255,0.8);
@@ -210,8 +210,8 @@
             background: #0f0f23;
         }
         body.dark-mode .sidebar-header {
-            background: rgba(0,0,0,0.25);
-            border-color: #2d2d44 !important;
+            background: rgba(255,255,255,0.15);
+            border-color: rgba(255,255,255,0.1) !important;
         }
         body.dark-mode .sidebar-user {
             border-color: #2d2d44 !important;
@@ -340,7 +340,7 @@
                     {% endif %}
                 </h5>
             </a>
-            <button class="btn btn-link text-white p-0 d-md-none" id="menu-close">
+            <button class="btn btn-link text-dark p-0 d-md-none" id="menu-close">
                 <i class="bi bi-x-lg"></i>
             </button>
         </div>
