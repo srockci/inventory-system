@@ -362,6 +362,73 @@ def stock_in_page():
     products = Product.query.order_by(Product.name).all()
     return render_template('stock_in.html', products=products)
 
+@app.route('/stock-in/import', methods=['POST'])
+@login_required
+def import_stock_in():
+    """批量导入入库"""
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'message': '没有上传文件'})
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'success': False, 'message': '没有选择文件'})
+    
+    try:
+        from openpyxl import load_workbook
+        
+        wb = load_workbook(file)
+        ws = wb.active
+        
+        # 跳过表头，从第二行开始读取
+        success_count = 0
+        error_list = []
+        
+        for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+            code = str(row[0]).strip() if row[0] else ''
+            quantity = row[1]
+            remark = str(row[2]).strip() if row[2] else ''
+            
+            if not code:
+                continue
+            
+            # 支持扫码格式
+            if code.startswith('INV:'):
+                code = code[4:]
+            
+            product = get_product_by_code(code)
+            if not product:
+                error_list.append(f'第{row_idx}行: 商品编码不存在 {code}')
+                continue
+            
+            if quantity is None or quantity <= 0:
+                error_list.append(f'第{row_idx}行: 数量无效 {quantity}')
+                continue
+            
+            stock_in = StockIn(
+                product_id=product.id,
+                quantity=int(quantity),
+                operator=session['username'],
+                remark=remark
+            )
+            product.current_stock += int(quantity)
+            db.session.add(stock_in)
+            success_count += 1
+        
+        db.session.commit()
+        
+        message = f'成功导入 {success_count} 条记录'
+        if error_list:
+            message += f'，{len(error_list)} 条失败'
+        
+        return jsonify({
+            'success': success_count > 0,
+            'message': message,
+            'errors': error_list[:10]  # 最多返回10条错误
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'导入失败: {str(e)}'})
+
 @app.route('/stock-in/do', methods=['POST'])
 @login_required
 def do_stock_in():
@@ -426,6 +493,75 @@ def stock_out_page():
     products = Product.query.order_by(Product.name).all()
     categories = Category.query.order_by(Category.name).all()
     return render_template('stock_out.html', products=products, categories=categories)
+
+@app.route('/stock-out/import', methods=['POST'])
+@login_required
+def import_stock_out():
+    """批量导入出库"""
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'message': '没有上传文件'})
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'success': False, 'message': '没有选择文件'})
+    
+    try:
+        from openpyxl import load_workbook
+        
+        wb = load_workbook(file)
+        ws = wb.active
+        
+        success_count = 0
+        error_list = []
+        
+        for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+            code = str(row[0]).strip() if row[0] else ''
+            quantity = row[1]
+            remark = str(row[2]).strip() if row[2] else ''
+            
+            if not code:
+                continue
+            
+            if code.startswith('INV:'):
+                code = code[4:]
+            
+            product = get_product_by_code(code)
+            if not product:
+                error_list.append(f'第{row_idx}行: 商品编码不存在 {code}')
+                continue
+            
+            if quantity is None or quantity <= 0:
+                error_list.append(f'第{row_idx}行: 数量无效 {quantity}')
+                continue
+            
+            if product.current_stock < quantity:
+                error_list.append(f'第{row_idx}行: 库存不足 (当前 {product.current_stock})')
+                continue
+            
+            stock_out = StockOut(
+                product_id=product.id,
+                quantity=int(quantity),
+                operator=session['username'],
+                remark=remark
+            )
+            product.current_stock -= int(quantity)
+            db.session.add(stock_out)
+            success_count += 1
+        
+        db.session.commit()
+        
+        message = f'成功导出 {success_count} 条记录'
+        if error_list:
+            message += f'，{len(error_list)} 条失败'
+        
+        return jsonify({
+            'success': success_count > 0,
+            'message': message,
+            'errors': error_list[:10]
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'导入失败: {str(e)}'})
 
 @app.route('/stock-out/do', methods=['POST'])
 @login_required

@@ -3,7 +3,43 @@
 {% block title %}扫码入库{% endblock %}
 
 {% block content %}
-<h4 class="mb-4"><i class="bi bi-arrow-down-circle text-success"></i> 扫码入库</h4>
+<h4 class="mb-4">
+    <i class="bi bi-arrow-down-circle text-success"></i> 扫码入库
+    <button type="button" class="btn btn-success btn-sm ms-2" data-bs-toggle="modal" data-bs-target="#importModal">
+        <i class="bi bi-file-earmark-arrow-up"></i> 导入表格
+    </button>
+</h4>
+
+<!-- 导入 Modal -->
+<div class="modal fade" id="importModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">批量导入入库</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>请上传 Excel 文件（.xlsx），格式要求：</p>
+                <ul class="small">
+                    <li>第1列：商品编码</li>
+                    <li>第2列：数量</li>
+                    <li>第3列：备注（可选）</li>
+                </ul>
+                <div class="alert alert-info small">
+                    <a href="/static/template/stock_in_template.xlsx" download>下载模板文件</a>
+                </div>
+                <form id="importForm" enctype="multipart/form-data">
+                    <input type="file" id="importFile" name="file" accept=".xlsx" class="form-control">
+                </form>
+                <div id="importResult" class="mt-3"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-success" id="importBtn">导入</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <div class="row g-4">
     <!-- 左侧：扫码 + 商品选择 -->
@@ -266,6 +302,42 @@ document.querySelector('#stock-in-form').addEventListener('submit', async (e) =>
         setTimeout(() => toast.classList.remove('show'), 3000);
     } catch (err) {
         showToast('操作失败: ' + err.message, false);
+    }
+});
+
+// 导入功能
+document.getElementById('importBtn').addEventListener('click', async () => {
+    const fileInput = document.getElementById('importFile');
+    const resultDiv = document.getElementById('importResult');
+    
+    if (!fileInput.files[0]) {
+        resultDiv.innerHTML = '<div class="alert alert-warning">请选择文件</div>';
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    
+    try {
+        const res = await fetch('{{ url_for("import_stock_in") }}', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+            resultDiv.innerHTML = '<div class="alert alert-success"><i class="bi bi-check-circle"></i> ' + data.message + '</div>';
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            let html = '<div class="alert alert-danger"><i class="bi bi-x-circle"></i> ' + data.message;
+            if (data.errors && data.errors.length > 0) {
+                html += '<ul class="mb-0 mt-2">' + data.errors.map(e => '<li>' + e + '</li>').join('') + '</ul>';
+            }
+            html += '</div>';
+            resultDiv.innerHTML = html;
+        }
+    } catch (err) {
+        resultDiv.innerHTML = '<div class="alert alert-danger">导入失败: ' + err.message + '</div>';
     }
 });
 </script>
