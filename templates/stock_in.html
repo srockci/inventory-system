@@ -25,6 +25,12 @@
                 <div class="alert alert-info small">
                     <a href="/static/template/stock_in_template.xlsx" download>下载模板文件</a>
                 </div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="jdOrderCheck">
+                    <label class="form-check-label" for="jdOrderCheck">
+                        京东工采订单（自动识别商品）
+                    </label>
+                </div>
                 <form id="importForm" enctype="multipart/form-data">
                     <input type="file" id="importFile" name="file" accept=".xlsx" class="form-control">
                 </form>
@@ -318,7 +324,9 @@ document.getElementById('importBtn').addEventListener('click', async () => {
     formData.append('file', fileInput.files[0]);
     
     try {
-        const res = await fetch('{{ url_for("import_stock_in") }}', {
+        const isJdOrder = document.getElementById('jdOrderCheck').checked;
+        const url = isJdOrder ? '{{ url_for("import_jd_order") }}' : '{{ url_for("import_stock_in") }}';
+        const res = await fetch(url, {
             method: 'POST',
             body: formData
         });

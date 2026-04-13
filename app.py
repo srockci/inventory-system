@@ -429,6 +429,111 @@ def import_stock_in():
     except Exception as e:
         return jsonify({'success': False, 'message': f'导入失败: {str(e)}'})
 
+
+@app.route('/stock-in/import-jd', methods=['POST'])
+def import_jd_order():
+    """批量导入京东工采订单"""
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'message': '没有上传文件'})
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'success': False, 'message': '没有选择文件'})
+    
+    try:
+        from openpyxl import load_workbook
+        
+        wb = load_workbook(file)
+        ws = wb.active
+        
+        # 获取表头
+        headers = [str(h).strip() if h else '' for h in next(ws.iter_rows(min_row=1, max_row=1, values_only=True))]
+        
+        # 查找关键列索引
+        col_mapping = {}
+        for idx, header in enumerate(headers):
+            if header in ['商品编码', '物料编码']:
+                col_mapping['code'] = idx
+            elif header == '物料名称':
+                col_mapping['material_name'] = idx
+            elif header == '商品名称':
+                col_mapping['product_name'] = idx
+            elif header == '数量':
+                col_mapping['quantity'] = idx
+        
+        if 'code' not in col_mapping and 'material_name' not in col_mapping and 'product_name' not in col_mapping:
+            return jsonify({'success': False, 'message': '无法识别京东订单格式，请确保包含商品编码或商品名称列'})
+        
+        success_count = 0
+        error_list = []
+        
+        for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+            # 尝试获取商品编码
+            code = ''
+            if 'code' in col_mapping:
+                code = str(row[col_mapping['code']]).strip() if row[col_mapping['code']] else ''
+            
+            # 如果没有编码，尝试用商品名称匹配
+            product = None
+            if code:
+                if code.startswith('INV:'):
+                    code = code[4:]
+                product = get_product_by_code(code)
+            
+            # 如果没找到，尝试用物料名称匹配
+            if not product and 'material_name' in col_mapping:
+                material_name = str(row[col_mapping['material_name']]).strip() if row[col_mapping['material_name']] else ''
+                if material_name:
+                    product = Product.query.filter_by(name=material_name).first()
+            
+            # 再尝试用商品名称匹配
+            if not product and 'product_name' in col_mapping:
+                product_name = str(row[col_mapping['product_name']]).strip() if row[col_mapping['product_name']] else ''
+                if product_name:
+                    product = Product.query.filter_by(name=product_name).first()
+            
+            if not product:
+                name_hint = ''
+                if 'material_name' in col_mapping:
+                    name_hint = str(row[col_mapping['material_name']]).strip()[:20]
+                elif 'product_name' in col_mapping:
+                    name_hint = str(row[col_mapping['product_name']]).strip()[:20]
+                error_list.append(f'第{row_idx}行: 商品未找到 {name_hint}')
+                continue
+            
+            # 获取数量
+            quantity = row[col_mapping['quantity']] if 'quantity' in col_mapping else None
+            if quantity is None or quantity <= 0:
+                error_list.append(f'第{row_idx}行: 数量无效')
+                continue
+            
+            # 创建入库记录
+            stock_in = StockIn(
+                product_id=product.id,
+                quantity=int(quantity),
+                operator=session['username'],
+                remark='京东工采订单导入'
+            )
+            product.current_stock += int(quantity)
+            db.session.add(stock_in)
+            success_count += 1
+        
+        db.session.commit()
+        
+        message = f'成功导入 {success_count} 条记录'
+        if error_list:
+            message += f'，{len(error_list)} 条失败'
+        
+        return jsonify({
+            'success': success_count > 0,
+            'message': message,
+            'errors': error_list[:10]
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'导入失败: {str(e)}'})
+
+
 @app.route('/stock-in/do', methods=['POST'])
 @login_required
 def do_stock_in():
