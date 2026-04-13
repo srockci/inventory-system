@@ -9,8 +9,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 复制应用
 COPY . .
 
-# 初始化数据库
-RUN python app.py & sleep 3 && kill %1 2>/dev/null || true
+# 初始化数据库（只在首次创建时运行，已创建的会跳过）
+RUN python init_db.py
 
 EXPOSE 5000
 
