@@ -460,11 +460,18 @@ def import_jd_order():
                 col_mapping['product_name'] = idx
             elif header == '数量':
                 col_mapping['quantity'] = idx
+            elif header == '一级分类':
+                col_mapping['cat1'] = idx
+            elif header == '二级分类':
+                col_mapping['cat2'] = idx
+            elif header == '三级分类':
+                col_mapping['cat3'] = idx
         
         if 'code' not in col_mapping and 'material_name' not in col_mapping and 'product_name' not in col_mapping:
             return jsonify({'success': False, 'message': '无法识别京东订单格式，请确保包含商品编码或商品名称列'})
         
         success_count = 0
+        created_count = 0
         error_list = []
         
         for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
@@ -472,6 +479,13 @@ def import_jd_order():
             code = ''
             if 'code' in col_mapping:
                 code = str(row[col_mapping['code']]).strip() if row[col_mapping['code']] else ''
+            
+            # 获取商品名称（用于创建新品）
+            product_name = ''
+            if 'material_name' in col_mapping:
+                product_name = str(row[col_mapping['material_name']]).strip() if row[col_mapping['material_name']] else ''
+            if not product_name and 'product_name' in col_mapping:
+                product_name = str(row[col_mapping['product_name']]).strip() if row[col_mapping['product_name']] else ''
             
             # 如果没有编码，尝试用商品名称匹配
             product = None
@@ -488,16 +502,40 @@ def import_jd_order():
             
             # 再尝试用商品名称匹配
             if not product and 'product_name' in col_mapping:
-                product_name = str(row[col_mapping['product_name']]).strip() if row[col_mapping['product_name']] else ''
-                if product_name:
-                    product = Product.query.filter_by(name=product_name).first()
+                product_name_raw = str(row[col_mapping['product_name']]).strip() if row[col_mapping['product_name']] else ''
+                if product_name_raw:
+                    product = Product.query.filter_by(name=product_name_raw).first()
+            
+            # 如果仍未找到，尝试创建新品
+            if not product and product_name:
+                # 获取或创建分类
+                category_id = None
+                if 'cat3' in col_mapping:
+                    cat3_name = str(row[col_mapping['cat3']]).strip() if row[col_mapping['cat3']] else ''
+                    if cat3_name:
+                        category = Category.query.filter_by(name=cat3_name).first()
+                        if not category:
+                            category = Category(name=cat3_name)
+                            db.session.add(category)
+                            db.session.flush()
+                        category_id = category.id
+                
+                # 创建新品
+                project_id = session.get('current_project_id')
+                new_product = Product(
+                    code=code if code else f'JD{row_idx}',
+                    name=product_name,
+                    category_id=category_id,
+                    project_id=project_id,
+                    current_stock=0
+                )
+                db.session.add(new_product)
+                db.session.flush()
+                product = new_product
+                created_count += 1
             
             if not product:
-                name_hint = ''
-                if 'material_name' in col_mapping:
-                    name_hint = str(row[col_mapping['material_name']]).strip()[:20]
-                elif 'product_name' in col_mapping:
-                    name_hint = str(row[col_mapping['product_name']]).strip()[:20]
+                name_hint = product_name[:20] if product_name else (str(row[col_mapping.get('code', 0)]).strip()[:20] if 'code' in col_mapping else '未知')
                 error_list.append(f'第{row_idx}行: 商品未找到 {name_hint}')
                 continue
             
@@ -507,12 +545,22 @@ def import_jd_order():
                 error_list.append(f'第{row_idx}行: 数量无效')
                 continue
             
+            # 获取分类信息用于备注
+            cat_info = ''
+            if 'cat1' in col_mapping and 'cat2' in col_mapping and 'cat3' in col_mapping:
+                cat1 = str(row[col_mapping['cat1']]).strip() if row[col_mapping['cat1']] else ''
+                cat2 = str(row[col_mapping['cat2']]).strip() if row[col_mapping['cat2']] else ''
+                cat3 = str(row[col_mapping['cat3']]).strip() if row[col_mapping['cat3']] else ''
+                if cat1 and cat2 and cat3:
+                    cat_info = f'[{cat1}-{cat2}-{cat3}]'
+            
             # 创建入库记录
+            remark = f'京东工采订单导入 {cat_info}'.strip()
             stock_in = StockIn(
                 product_id=product.id,
                 quantity=int(quantity),
                 operator=session['username'],
-                remark='京东工采订单导入'
+                remark=remark
             )
             product.current_stock += int(quantity)
             db.session.add(stock_in)
@@ -520,20 +568,20 @@ def import_jd_order():
         
         db.session.commit()
         
-        message = f'成功导入 {success_count} 条记录'
+        msg = f'成功导入 {success_count} 条记录'
+        if created_count > 0:
+            msg += f'（新建 {created_count} 个商品）'
         if error_list:
-            message += f'，{len(error_list)} 条失败'
+            msg += f'，{len(error_list)} 条失败'
         
         return jsonify({
             'success': success_count > 0,
-            'message': message,
+            'message': msg,
             'errors': error_list[:10]
         })
         
     except Exception as e:
         return jsonify({'success': False, 'message': f'导入失败: {str(e)}'})
-
-
 @app.route('/stock-in/do', methods=['POST'])
 @login_required
 def do_stock_in():
