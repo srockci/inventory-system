@@ -52,33 +52,28 @@
 </div>
 
 <div class="row g-4">
-    <!-- 左侧：扫码 + 商品选择 -->
+    <!-- 左侧：扫码 + 商品选择 + 出库表单 -->
     <div class="col-lg-6">
-        <!-- 扫码区域 -->
         <div class="card mb-3">
             <div class="card-header">
-                <i class="bi bi-qr-code-scan"></i> 扫描商品二维码
+                <i class="bi bi-qr-code-scan"></i> 扫码出库
             </div>
             <div class="card-body">
-                <div class="qr-scanner-container">
+                <!-- 扫码区域 -->
+                <div class="qr-scanner-container mb-3">
                     <video id="qr-video" playsinline autoplay></video>
                     <div id="qr-result">扫描中...</div>
                 </div>
-                <div class="mt-3 text-center">
+                <div class="text-center mb-3">
                     <button type="button" class="btn btn-outline-primary" id="toggle-scan">
                         <i class="bi bi-camera"></i> 打开相机
                     </button>
                 </div>
-            </div>
-        </div>
-        
-        <!-- 商品选择 -->
-        <div class="card">
-            <div class="card-header">
-                <i class="bi bi-hand-index"></i> 商品选择
-            </div>
-            <div class="card-body">
-                <div class="row g-2">
+                
+                <hr>
+                
+                <!-- 商品选择 -->
+                <div class="row g-2 mb-3">
                     <div class="col-6">
                         <label class="form-label">选择分类</label>
                         <select id="category-select" class="form-select">
@@ -95,17 +90,8 @@
                         </select>
                     </div>
                 </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- 右侧：表单 -->
-    <div class="col-lg-6">
-        <div class="card">
-            <div class="card-header">
-                <i class="bi bi-keyboard"></i> 出库信息
-            </div>
-            <div class="card-body">
+                
+                <!-- 出库表单 -->
                 <form id="stock-in-form">
                     <div class="mb-3">
                         <label class="form-label">商品编码</label>
@@ -115,24 +101,40 @@
                                 <i class="bi bi-x"></i>
                             </button>
                         </div>
-                        <!-- 显示选中的商品信息 -->
                         <div id="selected-product-info" class="mt-2 text-muted small" style="display: none;">
                             <span id="selected-product-name"></span>
                             <span class="ms-2">当前库存: <strong id="selected-product-stock"></strong></span>
                         </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">数量 *</label>
-                        <input type="number" name="quantity" id="quantity" class="form-control" min="1" required placeholder="出库数量" value="1">
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label">数量 *</label>
+                            <input type="number" name="quantity" id="quantity" class="form-control" min="1" required placeholder="出库数量" value="1">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">备注</label>
+                            <input type="text" name="remark" class="form-control" placeholder="可选备注">
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">备注</label>
-                        <input type="text" name="remark" class="form-control" placeholder="可选备注">
-                    </div>
-                    <button type="submit" class="btn btn-danger w-100">
+                    <button type="submit" class="btn btn-danger w-100 mt-3">
                         <i class="bi bi-check-circle"></i> 确认出库
                     </button>
                 </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 右侧：批量导入 -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-file-earmark-arrow-up"></i> 批量导入
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">上传 Excel 文件批量导入出库记录</p>
+                <button type="button" class="btn btn-danger w-100" data-bs-toggle="modal" data-bs-target="#importModal">
+                    <i class="bi bi-upload"></i> 选择文件导入
+                </button>
             </div>
         </div>
     </div>
