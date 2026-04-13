@@ -466,6 +466,8 @@ def import_jd_order():
                 col_mapping['cat2'] = idx
             elif header == '三级分类':
                 col_mapping['cat3'] = idx
+            elif header == '订单状态':
+                col_mapping['order_status'] = idx
         
         if 'code' not in col_mapping and 'material_name' not in col_mapping and 'product_name' not in col_mapping:
             return jsonify({'success': False, 'message': '无法识别京东订单格式，请确保包含商品编码或商品名称列'})
@@ -475,6 +477,12 @@ def import_jd_order():
         error_list = []
         
         for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+            # 检查订单状态，跳过已取消的订单
+            if 'order_status' in col_mapping:
+                order_status = str(row[col_mapping['order_status']]).strip() if row[col_mapping['order_status']] else ''
+                if '取消' in order_status:
+                    continue
+            
             # 尝试获取商品编码
             code = ''
             if 'code' in col_mapping:
