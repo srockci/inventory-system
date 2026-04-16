@@ -3,7 +3,7 @@
 支持扫码入库/出库/盘点，商品二维码生成
 """
 
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_file, g
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_file, g, Response
 from flask_sqlalchemy import SQLAlchemy
 from functools import wraps
 import sqlite3
@@ -128,6 +128,20 @@ class Product(db.Model):
     project = db.relationship('Project', backref='products')
     category = db.relationship('Category', backref='products')
 
+
+
+class ProductMerge(db.Model):
+    """商品合并记录表"""
+    __tablename__ = 'product_merge'
+    id = db.Column(db.Integer, primary_key=True)
+    source_product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)  # 被合并的商品（将被删除）
+    target_product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)  # 目标商品（保留）
+    jd_code = db.Column(db.String(100))  # 京东编码
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    source_product = db.relationship('Product', foreign_keys=[source_product_id])
+    target_product = db.relationship('Product', foreign_keys=[target_product_id])
+
 class StockIn(db.Model):
     """入库记录表"""
     id = db.Column(db.Integer, primary_key=True)
@@ -192,6 +206,64 @@ def generate_qr_code(data):
 def get_product_by_code(code):
     """通过编码查找商品"""
     return Product.query.filter_by(code=code).first()
+
+def merge_products(source_id, target_id, jd_code=None):
+    """合并商品：把源商品库存和记录转移到目标商品，然后删除源商品"""
+    try:
+        source = Product.query.get(source_id)
+        target = Product.query.get(target_id)
+        
+        if not source or not target:
+            return False, "源商品或目标商品不存在"
+        
+        if source_id == target_id:
+            return False, "不能合并到自身"
+        
+        # 1. 把源商品的库存加到目标商品
+        target.current_stock += source.current_stock
+        
+        # 2. 转移所有入库记录
+        StockIn.query.filter_by(product_id=source_id).update({'product_id': target_id})
+        
+        # 3. 转移所有出库记录
+        StockOut.query.filter_by(product_id=source_id).update({'product_id': target_id})
+        
+        # 4. 记录合并
+        merge_record = ProductMerge(
+            source_product_id=source_id,
+            target_product_id=target_id,
+            jd_code=jd_code
+        )
+        db.session.add(merge_record)
+        
+        # 5. 删除源商品
+        db.session.delete(source)
+        
+        db.session.commit()
+        return True, f"成功合并到 {target.code}"
+    except Exception as e:
+        db.session.rollback()
+        return False, str(e)
+
+def get_merged_product(jd_code, project_id):
+    """查找京东编码对应的商品，如果已被合并则返回合并后的目标商品"""
+    if not jd_code:
+        return None
+    
+    # 先查找商品
+    product = Product.query.filter_by(jd_code=jd_code, project_id=project_id).first()
+    
+    if not product:
+        return None
+    
+    # 查找是否有合并记录（该商品是否被合并到其他商品）
+    merge = ProductMerge.query.filter_by(source_product_id=product.id).first()
+    if merge:
+        return Product.query.get(merge.target_product_id)
+    
+    return product
+
+
 
 # ============ 登录装饰器 ============
 
@@ -410,7 +482,7 @@ def import_stock_in():
                 operator=session['username'],
                 remark=remark
             )
-            product.current_stock += int(quantity)
+            product.current_stock += q
             db.session.add(stock_in)
             success_count += 1
         
@@ -549,7 +621,11 @@ def import_jd_order():
             
             # 获取数量
             quantity = row[col_mapping['quantity']] if 'quantity' in col_mapping else None
-            if quantity is None or quantity <= 0:
+            try:
+                q = int(float(str(quantity)))
+            except:
+                q = -1
+            if q <= 0:
                 error_list.append(f'第{row_idx}行: 数量无效')
                 continue
             
@@ -566,11 +642,11 @@ def import_jd_order():
             remark = f'京东工采订单导入 {cat_info}'.strip()
             stock_in = StockIn(
                 product_id=product.id,
-                quantity=int(quantity),
+                quantity=q,
                 operator=session['username'],
                 remark=remark
             )
-            product.current_stock += int(quantity)
+            product.current_stock += q
             db.session.add(stock_in)
             success_count += 1
         
@@ -1656,6 +1732,152 @@ def init_db():
         
         db.session.commit()
         print('数据库初始化完成')
+
+
+
+@app.route('/api/products/batch-delete', methods=['POST'])
+@login_required
+def batch_delete_products():
+    """批量删除商品"""
+    try:
+        data = request.get_json()
+        ids = data.get('ids', [])
+        
+        if not ids:
+            return jsonify({'success': False, 'message': '没有选择商品'})
+        
+        deleted = Product.query.filter(Product.id.in_(ids)).delete(synchronize_session=False)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': f'删除了 {deleted} 个商品'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/products/batch-update', methods=['POST'])
+@login_required
+def batch_update_products():
+    """批量更新商品"""
+    try:
+        data = request.get_json()
+        ids = data.get('ids', [])
+        category_id = data.get('category_id')
+        
+        if not ids:
+            return jsonify({'success': False, 'message': '没有选择商品'})
+        
+        products = Product.query.filter(Product.id.in_(ids)).all()
+        updated = 0
+        
+        if category_id:
+            for p in products:
+                p.category_id = int(category_id) if category_id else None
+                updated += 1
+        
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': f'更新了 {updated} 个商品'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/products/export')
+@login_required
+def export_products():
+    """导出选中的商品"""
+    ids = request.args.get('ids', '')
+    
+    if ids:
+        id_list = [int(x) for x in ids.split(',')]
+        products = Product.query.filter(Product.id.in_(id_list)).all()
+    else:
+        products = Product.query.all()
+    
+    import io
+    import csv
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['编码', '名称', '分类', '单位', '当前库存', '最低库存', '位置', '备注'])
+    
+    for p in products:
+        writer.writerow([
+            p.code,
+            p.name,
+            p.category.name if p.category else '',
+            p.unit,
+            p.current_stock,
+            p.min_stock,
+            p.location or '',
+            p.remark or ''
+        ])
+    
+    output.seek(0)
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename=products.csv'}
+    )
+
+
+
+@app.route('/api/products/merge-form')
+@login_required
+def merge_form():
+    """商品合并表单页面"""
+    return render_template('product_merge.html')
+
+@app.route('/api/products/search-by-jd', methods=['GET'])
+@login_required
+def search_by_jd():
+    """按京东编码搜索商品"""
+    jd_code = request.args.get('jd_code', '').strip()
+    project_id = session.get('current_project_id')
+    
+    if not jd_code:
+        return jsonify({'success': False, 'message': '请输入京东编码'})
+    
+    products = Product.query.filter(
+        Product.jd_code == jd_code,
+        Product.project_id == project_id
+    ).all()
+    
+    return jsonify({
+        'success': True,
+        'products': [{'id': p.id, 'code': p.code, 'name': p.name, 'jd_code': p.jd_code, 'current_stock': p.current_stock} for p in products]
+    })
+
+@app.route('/api/products/merge', methods=['POST'])
+@login_required
+def api_merge_products():
+    """执行商品合并"""
+    data = request.get_json()
+    source_id = data.get('source_id')
+    target_id = data.get('target_id')
+    jd_code = data.get('jd_code', '')
+    
+    if not source_id or not target_id:
+        return jsonify({'success': False, 'message': '请选择要合并的商品和目标商品'})
+    
+    success, msg = merge_products(int(source_id), int(target_id), jd_code)
+    return jsonify({'success': success, 'message': msg})
+
+@app.route('/api/products/merge-records', methods=['GET'])
+@login_required
+def get_merge_records():
+    """获取合并记录"""
+    records = ProductMerge.query.order_by(ProductMerge.created_at.desc()).limit(50).all()
+    return jsonify({
+        'records': [{
+            'id': r.id,
+            'source_code': r.source_product.code if r.source_product else '已删除',
+            'source_name': r.source_product.name if r.source_product else '已删除',
+            'target_code': r.target_product.code if r.target_product else '已删除',
+            'target_name': r.target_product.name if r.target_product else '已删除',
+            'jd_code': r.jd_code or '',
+            'created_at': r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else ''
+        } for r in records]
+    })
 
 if __name__ == '__main__':
     init_db()

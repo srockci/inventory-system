@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+
+{% block title %}商品合并{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0"><i class="bi bi-intersect"></i> 商品合并</h4>
+    <a href="{{ url_for('products') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> 返回商品管理
+    </a>
+</div>
+
+<div class="row g-4">
+    <!-- 合并表单 -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-union"></i> 合并商品
+            </div>
+            <div class="card-body">
+                <p class="text-muted small">输入京东编码搜索商品，选择要合并的商品和目标商品</p>
+                
+                <div class="mb-3">
+                    <label class="form-label">京东编码</label>
+                    <div class="input-group">
+                        <input type="text" id="jdCodeInput" class="form-control" placeholder="输入京东编码搜索">
+                        <button class="btn btn-outline-primary" onclick="searchByJdCode()">
+                            <i class="bi bi-search"></i> 搜索
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="searchResults" class="mb-3" style="display: none;">
+                    <label class="form-label">搜索到的商品</label>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>选择</th>
+                                    <th>编码</th>
+                                    <th>名称</th>
+                                    <th>京东编码</th>
+                                    <th>库存</th>
+                                </tr>
+                            </thead>
+                            <tbody id="searchResultsBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div id="mergeForm" style="display: none;">
+                    <hr>
+                    <div class="mb-3">
+                        <label class="form-label">被合并商品（库存将转移到目标商品）</label>
+                        <select id="sourceProduct" class="form-select">
+                            <option value="">请选择</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">目标商品（将保留）</label>
+                        <select id="targetProduct" class="form-select">
+                            <option value="">请选择</option>
+                        </select>
+                    </div>
+                    
+                    <button class="btn btn-warning w-100" onclick="executeMerge()">
+                        <i class="bi bi-intersect"></i> 执行合并
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 合并记录 -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-clock-history"></i> 合并记录
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>被合并</th>
+                                <th>→</th>
+                                <th>目标</th>
+                                <th>京东编码</th>
+                                <th>时间</th>
+                            </tr>
+                        </thead>
+                        <tbody id="mergeRecordsBody">
+                            <tr>
+                                <td colspan="5" class="text-center text-muted">加载中...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let products = [];
+
+function searchByJdCode() {
+    const jdCode = document.getElementById('jdCodeInput').value.trim();
+    if (!jdCode) {
+        alert('请输入京东编码');
+        return;
+    }
+    
+    fetch(`/api/products/search-by-jd?jd_code=${encodeURIComponent(jdCode)}`)
+        .then(r => r.json())
+        .then(d => {
+            if (d.success && d.products.length > 0) {
+                products = d.products;
+                displayResults(products);
+            } else {
+                alert('未找到商品');
+            }
+        })
+        .catch(err => alert('搜索失败: ' + err));
+}
+
+function displayResults(products) {
+    const container = document.getElementById('searchResults');
+    const tbody = document.getElementById('searchResultsBody');
+    const mergeForm = document.getElementById('mergeForm');
+    const sourceSelect = document.getElementById('sourceProduct');
+    const targetSelect = document.getElementById('targetProduct');
+    
+    tbody.innerHTML = '';
+    sourceSelect.innerHTML = '<option value="">请选择</option>';
+    targetSelect.innerHTML = '<option value="">请选择</option>';
+    
+    products.forEach(p => {
+        tbody.innerHTML += `
+            <tr>
+                <td><input type="radio" name="product" value="${p.id}" onchange="productSelected(${p.id})"></td>
+                <td><code>${p.code}</code></td>
+                <td>${p.name}</td>
+                <td><code>${p.jd_code}</code></td>
+                <td>${p.current_stock}</td>
+            </tr>
+        `;
+        sourceSelect.innerHTML += `<option value="${p.id}">${p.code} - ${p.name} (库存:${p.current_stock})</option>`;
+        targetSelect.innerHTML += `<option value="${p.id}">${p.code} - ${p.name} (库存:${p.current_stock})</option>`;
+    });
+    
+    container.style.display = 'block';
+    mergeForm.style.display = 'block';
+}
+
+function productSelected(id) {
+    document.getElementById('sourceProduct').value = id;
+    document.getElementById('targetProduct').value = id;
+}
+
+function executeMerge() {
+    const sourceId = document.getElementById('sourceProduct').value;
+    const targetId = document.getElementById('targetProduct').value;
+    const jdCode = document.getElementById('jdCodeInput').value.trim();
+    
+    if (!sourceId || !targetId) {
+        alert('请选择被合并商品和目标商品');
+        return;
+    }
+    
+    if (sourceId === targetId) {
+        alert('不能合并到自身');
+        return;
+    }
+    
+    if (!confirm('确定要合并吗？被合并商品的库存和记录将转移到目标商品。')) return;
+    
+    fetch('/api/products/merge', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            source_id: sourceId,
+            target_id: targetId,
+            jd_code: jdCode
+        })
+    })
+    .then(r => r.json())
+    .then(d => {
+        alert(d.message);
+        if (d.success) {
+            loadMergeRecords();
+            document.getElementById('jdCodeInput').value = '';
+            document.getElementById('searchResults').style.display = 'none';
+            document.getElementById('mergeForm').style.display = 'none';
+        }
+    })
+    .catch(err => alert('合并失败: ' + err));
+}
+
+function loadMergeRecords() {
+    fetch('/api/products/merge-records')
+        .then(r => r.json())
+        .then(d => {
+            const tbody = document.getElementById('mergeRecordsBody');
+            if (d.records.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">暂无记录</td></tr>';
+                return;
+            }
+            tbody.innerHTML = d.records.map(r => `
+                <tr>
+                    <td><code>${r.source_code}</code><br><small>${r.source_name}</small></td>
+                    <td>→</td>
+                    <td><code>${r.target_code}</code><br><small>${r.target_name}</small></td>
+                    <td><code>${r.jd_code}</code></td>
+                    <td><small>${r.created_at}</small></td>
+                </tr>
+            `).join('');
+        });
+}
+
+// 加载合并记录
+loadMergeRecords();
+</script>
+{% endblock %}
