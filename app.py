@@ -2072,11 +2072,47 @@ def import_database():
             db.session.add(user)
         db.session.commit()
         
-        return jsonify({'success': True, 'message': '数据导入成功！请重新设置所有用户密码。'})
+        # 导入完成后，设置一个临时恢复令牌
+        import uuid
+        reset_token = str(uuid.uuid4())[:8]
+        SystemSettings.set('password_reset_token', reset_token)
+        
+        return jsonify({
+            'success': True, 
+            'message': f'数据导入成功！恢复令牌: {reset_token}，可用于重置用户密码。',
+            'reset_token': reset_token
+        })
         
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': f'导入失败: {str(e)}'})
+
+@app.route('/api/database/reset-password', methods=['POST'])
+def reset_password_with_token():
+    """使用恢复令牌重置用户密码（用于导入后恢复访问）"""
+    data = request.get_json()
+    token = data.get('token', '')
+    username = data.get('username', '')
+    new_password = data.get('new_password', '')
+    
+    if not token or not username or not new_password:
+        return jsonify({'success': False, 'message': '缺少必要参数'})
+    
+    saved_token = SystemSettings.get('password_reset_token')
+    if not saved_token or saved_token != token:
+        return jsonify({'success': False, 'message': '恢复令牌无效'})
+    
+    if len(new_password) < 6:
+        return jsonify({'success': False, 'message': '密码至少6位'})
+    
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        return jsonify({'success': False, 'message': '用户不存在'})
+    
+    user.password_hash = hash_password(new_password)
+    db.session.commit()
+    
+    return jsonify({'success': True, 'message': f'用户 {username} 的密码已重置'})
 
 @app.route('/api/database/download')
 @login_required

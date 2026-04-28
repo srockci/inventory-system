@@ -341,8 +341,12 @@ async function importDatabase(file) {
         const data = await res.json();
         
         if (data.success) {
-            statusDiv.innerHTML = '<div class="alert alert-success">' + data.message + '</div>';
-            showToast(data.message, true);
+            var msg = data.message;
+            if (data.reset_token) {
+                msg += '<br><strong>恢复令牌: ' + data.reset_token + '</strong><br>请妥善保管此令牌！';
+            }
+            statusDiv.innerHTML = '<div class="alert alert-success">' + msg + '</div>';
+            showToast('导入成功', true);
         } else {
             statusDiv.innerHTML = '<div class="alert alert-danger">' + data.message + '</div>';
             showToast(data.message, false);
