@@ -3,7 +3,7 @@
 支持扫码入库/出库/盘点，商品二维码生成
 """
 
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_file, g, Response
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_file, g, Response, make_response
 from flask_sqlalchemy import SQLAlchemy
 from functools import wraps
 import sqlite3
@@ -1878,6 +1878,280 @@ def get_merge_records():
             'created_at': r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else ''
         } for r in records]
     })
+
+@app.route('/api/database/export')
+@login_required
+def export_database():
+    """导出整个数据库为JSON文件"""
+    from app import db
+    
+    # 导出所有表的数据
+    tables = {}
+    
+    # 用户
+    users = User.query.all()
+    tables['users'] = [{'id': u.id, 'username': u.username, 'role': u.role, 'created_at': u.created_at.isoformat() if u.created_at else ''} for u in users]
+    
+    # 项目
+    projects = Project.query.all()
+    tables['projects'] = [{'id': p.id, 'name': p.name, 'code': p.code, 'description': p.description, 'logo': p.logo, 'is_active': p.is_active, 'created_at': p.created_at.isoformat() if p.created_at else ''} for p in projects]
+    
+    # 分类
+    categories = Category.query.all()
+    tables['categories'] = [{'id': c.id, 'name': c.name, 'project_id': c.project_id, 'created_at': c.created_at.isoformat() if c.created_at else ''} for c in categories]
+    
+    # 商品
+    products = Product.query.all()
+    tables['products'] = [{
+        'id': p.id, 'project_id': p.project_id, 'category_id': p.category_id,
+        'code': p.code, 'name': p.name, 'spec': p.spec, 'unit': p.unit,
+        'price': p.price, 'cost': p.cost, 'stock': p.stock, 'min_stock': p.min_stock,
+        'jd_code': p.jd_code, 'bar_code': p.bar_code,
+        'created_at': p.created_at.isoformat() if p.created_at else ''
+    } for p in products]
+    
+    # 系统设置
+    settings = SystemSettings.query.all()
+    tables['system_settings'] = [{'id': s.id, 'key': s.key, 'value': s.value} for s in settings]
+    
+    # 出入库记录
+    stock_records = StockRecord.query.all()
+    tables['stock_records'] = [{
+        'id': r.id, 'project_id': r.project_id, 'product_id': r.product_id,
+        'type': r.type, 'quantity': r.quantity, 'price': r.price,
+        'total_price': r.total_price, 'operator': r.operator,
+        'remark': r.remark, 'created_at': r.created_at.isoformat() if r.created_at else ''
+    } for r in stock_records]
+    
+    # 库存盘点
+    checks = StockCheck.query.all()
+    tables['stock_checks'] = [{
+        'id': c.id, 'project_id': c.project_id, 'checked_at': c.checked_at.isoformat() if c.checked_at else '',
+        'operator': c.operator, 'status': c.status, 'remark': c.remark,
+        'created_at': c.created_at.isoformat() if c.created_at else ''
+    } for c in checks]
+    
+    # 盘点明细
+    check_records = StockCheckRecord.query.all()
+    tables['stock_check_records'] = [{
+        'id': r.id, 'check_id': r.check_id, 'product_id': r.product_id,
+        'system_stock': r.system_stock, 'actual_stock': r.actual_stock,
+        'difference': r.difference, 'remark': r.remark
+    } for r in check_records]
+    
+    # 商品合并记录
+    merges = ProductMerge.query.all()
+    tables['product_merges'] = [{
+        'id': m.id, 'source_product_id': m.source_product_id, 'target_product_id': m.target_product_id,
+        'jd_code': m.jd_code, 'created_at': m.created_at.isoformat() if m.created_at else ''
+    } for m in merges]
+    
+    # 生成文件名
+    filename = f'inventory_backup_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
+    
+    response = make_response(jsonify({'success': True, 'data': tables, 'filename': filename}))
+    response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+    return response
+
+@app.route('/api/database/import', methods=['POST'])
+@login_required
+def import_database():
+    """从JSON文件导入数据"""
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'message': '没有上传文件'})
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'success': False, 'message': '没有选择文件'})
+    
+    if not file.filename.endswith('.json'):
+        return jsonify({'success': False, 'message': '只支持JSON格式文件'})
+    
+    try:
+        data = json.load(file)
+        
+        # 验证必要字段
+        required_tables = ['users', 'projects', 'categories', 'products', 'system_settings']
+        for table in required_tables:
+            if table not in data:
+                return jsonify({'success': False, 'message': f'缺少必需的表: {table}'})
+        
+        # 清空现有数据（按顺序）
+        StockCheckRecord.query.delete()
+        StockCheck.query.delete()
+        StockRecord.query.delete()
+        ProductMerge.query.delete()
+        Product.query.delete()
+        Category.query.delete()
+        Project.query.delete()
+        User.query.delete()
+        SystemSettings.query.delete()
+        db.session.commit()
+        
+        # 导入项目
+        for p in data.get('projects', []):
+            project = Project(
+                id=p['id'], name=p['name'], code=p['code'],
+                description=p.get('description'), logo=p.get('logo'),
+                is_active=p.get('is_active', True)
+            )
+            db.session.add(project)
+        db.session.commit()
+        
+        # 导入分类
+        for c in data.get('categories', []):
+            cat = Category(id=c['id'], name=c['name'], project_id=c.get('project_id'))
+            db.session.add(cat)
+        db.session.commit()
+        
+        # 导入商品
+        for p in data.get('products', []):
+            prod = Product(
+                id=p['id'], project_id=p['project_id'], category_id=p.get('category_id'),
+                code=p['code'], name=p['name'], spec=p.get('spec'), unit=p.get('unit'),
+                price=p.get('price', 0), cost=p.get('cost', 0), stock=p.get('stock', 0),
+                min_stock=p.get('min_stock', 0), jd_code=p.get('jd_code'), bar_code=p.get('bar_code')
+            )
+            db.session.add(prod)
+        db.session.commit()
+        
+        # 导入系统设置
+        for s in data.get('system_settings', []):
+            setting = SystemSettings(key=s['key'], value=s.get('value'))
+            db.session.add(setting)
+        db.session.commit()
+        
+        # 导入出入库记录
+        for r in data.get('stock_records', []):
+            record = StockRecord(
+                id=r['id'], project_id=r['project_id'], product_id=r['product_id'],
+                type=r['type'], quantity=r['quantity'], price=r.get('price', 0),
+                total_price=r.get('total_price', 0), operator=r.get('operator', ''),
+                remark=r.get('remark', '')
+            )
+            db.session.add(record)
+        db.session.commit()
+        
+        # 导入库存盘点
+        for c in data.get('stock_checks', []):
+            check = StockCheck(
+                id=c['id'], project_id=c['project_id'],
+                operator=c.get('operator', ''), status=c.get('status', 'pending'),
+                remark=c.get('remark', '')
+            )
+            if c.get('checked_at'):
+                check.checked_at = datetime.fromisoformat(c['checked_at'])
+            db.session.add(check)
+        db.session.commit()
+        
+        # 导入盘点明细
+        for r in data.get('stock_check_records', []):
+            rec = StockCheckRecord(
+                id=r['id'], check_id=r['check_id'], product_id=r['product_id'],
+                system_stock=r.get('system_stock', 0), actual_stock=r.get('actual_stock', 0),
+                difference=r.get('difference', 0), remark=r.get('remark', '')
+            )
+            db.session.add(rec)
+        db.session.commit()
+        
+        # 导入商品合并记录
+        for m in data.get('product_merges', []):
+            merge = ProductMerge(
+                id=m['id'], source_product_id=m['source_product_id'],
+                target_product_id=m['target_product_id'], jd_code=m.get('jd_code')
+            )
+            db.session.add(merge)
+        db.session.commit()
+        
+        # 导入用户（最后导入，因为有密码哈希）
+        for u in data.get('users', []):
+            user = User(
+                id=u['id'], username=u['username'], role=u.get('role', 'user'),
+                password_hash=''  # 不迁移密码，需要重置
+            )
+            db.session.add(user)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': '数据导入成功！请重新设置所有用户密码。'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'导入失败: {str(e)}'})
+
+@app.route('/api/database/download')
+@login_required
+def download_database():
+    """下载JSON格式的数据库备份文件"""
+    from app import db
+    
+    tables = {}
+    
+    users = User.query.all()
+    tables['users'] = [{'id': u.id, 'username': u.username, 'role': u.role, 'created_at': u.created_at.isoformat() if u.created_at else ''} for u in users]
+    
+    projects = Project.query.all()
+    tables['projects'] = [{'id': p.id, 'name': p.name, 'code': p.code, 'description': p.description, 'logo': p.logo, 'is_active': p.is_active, 'created_at': p.created_at.isoformat() if p.created_at else ''} for p in projects]
+    
+    categories = Category.query.all()
+    tables['categories'] = [{'id': c.id, 'name': c.name, 'project_id': c.project_id, 'created_at': c.created_at.isoformat() if c.created_at else ''} for c in categories]
+    
+    products = Product.query.all()
+    tables['products'] = [{
+        'id': p.id, 'project_id': p.project_id, 'category_id': p.category_id,
+        'code': p.code, 'name': p.name, 'spec': p.spec, 'unit': p.unit,
+        'price': p.price, 'cost': p.cost, 'stock': p.stock, 'min_stock': p.min_stock,
+        'jd_code': p.jd_code, 'bar_code': p.bar_code,
+        'created_at': p.created_at.isoformat() if p.created_at else ''
+    } for p in products]
+    
+    settings = SystemSettings.query.all()
+    tables['system_settings'] = [{'id': s.id, 'key': s.key, 'value': s.value} for s in settings]
+    
+    stock_records = StockRecord.query.all()
+    tables['stock_records'] = [{
+        'id': r.id, 'project_id': r.project_id, 'product_id': r.product_id,
+        'type': r.type, 'quantity': r.quantity, 'price': r.price,
+        'total_price': r.total_price, 'operator': r.operator,
+        'remark': r.remark, 'created_at': r.created_at.isoformat() if r.created_at else ''
+    } for r in stock_records]
+    
+    checks = StockCheck.query.all()
+    tables['stock_checks'] = [{
+        'id': c.id, 'project_id': c.project_id, 'checked_at': c.checked_at.isoformat() if c.checked_at else '',
+        'operator': c.operator, 'status': c.status, 'remark': c.remark,
+        'created_at': c.created_at.isoformat() if c.created_at else ''
+    } for c in checks]
+    
+    check_records = StockCheckRecord.query.all()
+    tables['stock_check_records'] = [{
+        'id': r.id, 'check_id': r.check_id, 'product_id': r.product_id,
+        'system_stock': r.system_stock, 'actual_stock': r.actual_stock,
+        'difference': r.difference, 'remark': r.remark
+    } for r in check_records]
+    
+    merges = ProductMerge.query.all()
+    tables['product_merges'] = [{
+        'id': m.id, 'source_product_id': m.source_product_id, 'target_product_id': m.target_product_id,
+        'jd_code': m.jd_code, 'created_at': m.created_at.isoformat() if m.created_at else ''
+    } for m in merges]
+    
+    filename = f'inventory_backup_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
+    
+    import io
+    import os
+    
+    json_str = json.dumps(tables, ensure_ascii=False, indent=2)
+    
+    mem = io.BytesIO()
+    mem.write(json_str.encode('utf-8'))
+    mem.seek(0)
+    
+    return send_file(
+        mem,
+        mimetype='application/json',
+        as_attachment=True,
+        download_name=filename
+    )
 
 if __name__ == '__main__':
     init_db()

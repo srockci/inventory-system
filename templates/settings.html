@@ -108,6 +108,35 @@
         </div>
     </div>
     
+    <!-- 数据库备份 -->
+    <div class="col-md-6">
+        <div class="card settings-card">
+            <div class="card-header">
+                <i class="bi bi-database-check"></i> 数据库备份与恢复
+            </div>
+            <div class="card-body">
+                <p class="text-muted small">导出/导入整个系统的数据，用于迁移或备份。</p>
+                <div class="d-flex gap-2 mb-3">
+                    <button type="button" class="btn btn-success" onclick="exportDatabase()">
+                        <i class="bi bi-download"></i> 导出数据库
+                    </button>
+                    <button type="button" class="btn btn-warning" onclick="document.getElementById('import_file').click()">
+                        <i class="bi bi-upload"></i> 导入数据库
+                    </button>
+                    <input type="file" id="import_file" accept=".json" style="display: none;" onchange="importDatabase(this.files[0])">
+                </div>
+                <div id="import_status" class="mt-2"></div>
+                <hr>
+                <p class="text-danger small mb-1"><i class="bi bi-exclamation-triangle"></i> 注意事项：</p>
+                <ul class="text-danger small">
+                    <li>导入会覆盖所有现有数据</li>
+                    <li>用户密码需要重新设置</li>
+                    <li>建议导入前先导出备份</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
     <!-- 预览 -->
     <div class="col-md-6">
         <div class="card settings-card">
@@ -258,6 +287,72 @@ async function resetBackground() {
     } catch (err) {
         showToast('删除失败', false);
     }
+}
+
+// 导出数据库
+async function exportDatabase() {
+    try {
+        const res = await fetch('{{ url_for("download_database") }}');
+        if (!res.ok) throw new Error('导出失败');
+        
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        
+        // 从Content-Disposition获取文件名
+        const disposition = res.headers.get('Content-Disposition');
+        let filename = 'inventory_backup.json';
+        if (disposition && disposition.indexOf('filename=') !== -1) {
+            filename = decodeURIComponent(disposition.split('filename=')[1].replace(/['"]/g, ''));
+        }
+        
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        showToast('导出成功', true);
+    } catch (err) {
+        showToast('导出失败: ' + err.message, false);
+    }
+}
+
+// 导入数据库
+async function importDatabase(file) {
+    if (!file) return;
+    
+    if (!confirm('导入将覆盖所有现有数据！确认继续吗？')) {
+        document.getElementById('import_file').value = '';
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const statusDiv = document.getElementById('import_status');
+    statusDiv.innerHTML = '<div class="alert alert-info">正在导入...</div>';
+    
+    try {
+        const res = await fetch('{{ url_for("import_database") }}', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+            statusDiv.innerHTML = '<div class="alert alert-success">' + data.message + '</div>';
+            showToast(data.message, true);
+        } else {
+            statusDiv.innerHTML = '<div class="alert alert-danger">' + data.message + '</div>';
+            showToast(data.message, false);
+        }
+    } catch (err) {
+        statusDiv.innerHTML = '<div class="alert alert-danger">导入失败: ' + err.message + '</div>';
+        showToast('导入失败', false);
+    }
+    
+    document.getElementById('import_file').value = '';
 }
 </script>
 {% endblock %}
