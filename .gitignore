@@ -30,3 +30,4 @@ Thumbs.db
 
 # Docker
 .dockerignore
+instance/*.db
