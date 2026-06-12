@@ -8,6 +8,7 @@ from flask_sqlalchemy import SQLAlchemy
 from functools import wraps
 import sqlite3
 import uuid
+import hashlib
 import qrcode
 import io
 import base64
@@ -183,9 +184,12 @@ def generate_code():
     """生成商品编码"""
     return 'P' + datetime.now().strftime('%Y%m%d%H%M%S') + str(uuid.uuid4().hex[:4]).upper()
 
+def _name_to_jd_code(name):
+    """根据商品名称生成稳定的京东导入编码（同一名称始终生成相同编码，重复导入不会冲突）"""
+    return f'JD-{hashlib.md5(name.encode("utf-8")).hexdigest()[:8].upper()}'
+
 def hash_password(pwd):
     """简单密码hash"""
-    import hashlib
     return hashlib.sha256(pwd.encode()).hexdigest()
 
 def verify_password(pwd, hashed):
@@ -482,7 +486,7 @@ def import_stock_in():
                 operator=session['username'],
                 remark=remark
             )
-            product.current_stock += q
+            product.current_stock += int(quantity)
             db.session.add(stock_in)
             success_count += 1
         
@@ -586,6 +590,10 @@ def import_jd_order():
                 if product_name_raw:
                     product = Product.query.filter_by(name=product_name_raw).first()
             
+            # 再次尝试：用名称哈希编码匹配（兼容商品名称有轻微变动但编码一致的旧数据）
+            if not product and product_name:
+                product = get_product_by_code(_name_to_jd_code(product_name))
+            
             # 如果仍未找到，尝试创建新品
             if not product and product_name:
                 # 获取或创建分类
@@ -601,9 +609,11 @@ def import_jd_order():
                         category_id = category.id
                 
                 # 创建新品
+                # 编码优先使用京东订单自带的编码，否则用商品名称的哈希生成稳定编码
+                # 名称哈希保证同一商品多次导入生成相同编码，不会触发 UNIQUE 约束
                 project_id = session.get('current_project_id')
                 new_product = Product(
-                    code=code if code else f'JD{row_idx}',
+                    code=code if code else _name_to_jd_code(product_name),
                     name=product_name,
                     category_id=category_id,
                     project_id=project_id,
@@ -1904,9 +1914,9 @@ def export_database():
     products = Product.query.all()
     tables['products'] = [{
         'id': p.id, 'project_id': p.project_id, 'category_id': p.category_id,
-        'code': p.code, 'name': p.name, 'spec': p.spec, 'unit': p.unit,
-        'price': p.price, 'cost': p.cost, 'stock': p.stock, 'min_stock': p.min_stock,
-        'jd_code': p.jd_code, 'bar_code': p.bar_code,
+        'code': p.code, 'name': p.name, 'unit': p.unit,
+        'current_stock': p.current_stock, 'min_stock': p.min_stock,
+        'location': p.location, 'image_url': p.image_url, 'remark': p.remark,
         'created_at': p.created_at.isoformat() if p.created_at else ''
     } for p in products]
     
@@ -1914,30 +1924,30 @@ def export_database():
     settings = SystemSettings.query.all()
     tables['system_settings'] = [{'id': s.id, 'key': s.key, 'value': s.value} for s in settings]
     
-    # 出入库记录
-    stock_records = StockRecord.query.all()
-    tables['stock_records'] = [{
-        'id': r.id, 'project_id': r.project_id, 'product_id': r.product_id,
-        'type': r.type, 'quantity': r.quantity, 'price': r.price,
-        'total_price': r.total_price, 'operator': r.operator,
-        'remark': r.remark, 'created_at': r.created_at.isoformat() if r.created_at else ''
-    } for r in stock_records]
+    # 入库记录
+    stock_ins = StockIn.query.all()
+    tables['stock_ins'] = [{
+        'id': r.id, 'product_id': r.product_id, 'quantity': r.quantity,
+        'operator': r.operator, 'remark': r.remark,
+        'created_at': r.created_at.isoformat() if r.created_at else ''
+    } for r in stock_ins]
     
-    # 库存盘点
+    # 出库记录
+    stock_outs = StockOut.query.all()
+    tables['stock_outs'] = [{
+        'id': r.id, 'product_id': r.product_id, 'quantity': r.quantity,
+        'operator': r.operator, 'remark': r.remark,
+        'created_at': r.created_at.isoformat() if r.created_at else ''
+    } for r in stock_outs]
+    
+    # 盘点记录
     checks = StockCheck.query.all()
     tables['stock_checks'] = [{
-        'id': c.id, 'project_id': c.project_id, 'checked_at': c.checked_at.isoformat() if c.checked_at else '',
-        'operator': c.operator, 'status': c.status, 'remark': c.remark,
+        'id': c.id, 'product_id': c.product_id,
+        'actual_stock': c.actual_stock, 'system_stock': c.system_stock,
+        'diff': c.diff, 'operator': c.operator, 'remark': c.remark,
         'created_at': c.created_at.isoformat() if c.created_at else ''
     } for c in checks]
-    
-    # 盘点明细
-    check_records = StockCheckRecord.query.all()
-    tables['stock_check_records'] = [{
-        'id': r.id, 'check_id': r.check_id, 'product_id': r.product_id,
-        'system_stock': r.system_stock, 'actual_stock': r.actual_stock,
-        'difference': r.difference, 'remark': r.remark
-    } for r in check_records]
     
     # 商品合并记录
     merges = ProductMerge.query.all()
@@ -1977,9 +1987,9 @@ def import_database():
                 return jsonify({'success': False, 'message': f'缺少必需的表: {table}'})
         
         # 清空现有数据（按顺序）
-        StockCheckRecord.query.delete()
         StockCheck.query.delete()
-        StockRecord.query.delete()
+        StockOut.query.delete()
+        StockIn.query.delete()
         ProductMerge.query.delete()
         Product.query.delete()
         Category.query.delete()
@@ -2008,9 +2018,10 @@ def import_database():
         for p in data.get('products', []):
             prod = Product(
                 id=p['id'], project_id=p['project_id'], category_id=p.get('category_id'),
-                code=p['code'], name=p['name'], spec=p.get('spec'), unit=p.get('unit'),
-                price=p.get('price', 0), cost=p.get('cost', 0), stock=p.get('stock', 0),
-                min_stock=p.get('min_stock', 0), jd_code=p.get('jd_code'), bar_code=p.get('bar_code')
+                code=p['code'], name=p['name'], unit=p.get('unit', '件'),
+                current_stock=p.get('current_stock', 0), min_stock=p.get('min_stock', 0),
+                location=p.get('location', ''), image_url=p.get('image_url'),
+                remark=p.get('remark', '')
             )
             db.session.add(prod)
         db.session.commit()
@@ -2021,37 +2032,33 @@ def import_database():
             db.session.add(setting)
         db.session.commit()
         
-        # 导入出入库记录
-        for r in data.get('stock_records', []):
-            record = StockRecord(
-                id=r['id'], project_id=r['project_id'], product_id=r['product_id'],
-                type=r['type'], quantity=r['quantity'], price=r.get('price', 0),
-                total_price=r.get('total_price', 0), operator=r.get('operator', ''),
-                remark=r.get('remark', '')
+        # 导入入库记录
+        for r in data.get('stock_ins', []):
+            record = StockIn(
+                id=r['id'], product_id=r['product_id'], quantity=r['quantity'],
+                operator=r.get('operator', ''), remark=r.get('remark', '')
             )
             db.session.add(record)
         db.session.commit()
         
-        # 导入库存盘点
-        for c in data.get('stock_checks', []):
-            check = StockCheck(
-                id=c['id'], project_id=c['project_id'],
-                operator=c.get('operator', ''), status=c.get('status', 'pending'),
-                remark=c.get('remark', '')
+        # 导入出库记录
+        for r in data.get('stock_outs', []):
+            record = StockOut(
+                id=r['id'], product_id=r['product_id'], quantity=r['quantity'],
+                operator=r.get('operator', ''), remark=r.get('remark', '')
             )
-            if c.get('checked_at'):
-                check.checked_at = datetime.fromisoformat(c['checked_at'])
-            db.session.add(check)
+            db.session.add(record)
         db.session.commit()
         
-        # 导入盘点明细
-        for r in data.get('stock_check_records', []):
-            rec = StockCheckRecord(
-                id=r['id'], check_id=r['check_id'], product_id=r['product_id'],
-                system_stock=r.get('system_stock', 0), actual_stock=r.get('actual_stock', 0),
-                difference=r.get('difference', 0), remark=r.get('remark', '')
+        # 导入盘点记录
+        for c in data.get('stock_checks', []):
+            check = StockCheck(
+                id=c['id'], product_id=c['product_id'],
+                actual_stock=c.get('actual_stock', 0), system_stock=c.get('system_stock', 0),
+                diff=c.get('diff', 0), operator=c.get('operator', ''),
+                remark=c.get('remark', '')
             )
-            db.session.add(rec)
+            db.session.add(check)
         db.session.commit()
         
         # 导入商品合并记录
@@ -2134,36 +2141,36 @@ def download_database():
     products = Product.query.all()
     tables['products'] = [{
         'id': p.id, 'project_id': p.project_id, 'category_id': p.category_id,
-        'code': p.code, 'name': p.name, 'spec': p.spec, 'unit': p.unit,
-        'price': p.price, 'cost': p.cost, 'stock': p.stock, 'min_stock': p.min_stock,
-        'jd_code': p.jd_code, 'bar_code': p.bar_code,
+        'code': p.code, 'name': p.name, 'unit': p.unit,
+        'current_stock': p.current_stock, 'min_stock': p.min_stock,
+        'location': p.location, 'image_url': p.image_url, 'remark': p.remark,
         'created_at': p.created_at.isoformat() if p.created_at else ''
     } for p in products]
     
     settings = SystemSettings.query.all()
     tables['system_settings'] = [{'id': s.id, 'key': s.key, 'value': s.value} for s in settings]
     
-    stock_records = StockRecord.query.all()
-    tables['stock_records'] = [{
-        'id': r.id, 'project_id': r.project_id, 'product_id': r.product_id,
-        'type': r.type, 'quantity': r.quantity, 'price': r.price,
-        'total_price': r.total_price, 'operator': r.operator,
-        'remark': r.remark, 'created_at': r.created_at.isoformat() if r.created_at else ''
-    } for r in stock_records]
+    stock_ins = StockIn.query.all()
+    tables['stock_ins'] = [{
+        'id': r.id, 'product_id': r.product_id, 'quantity': r.quantity,
+        'operator': r.operator, 'remark': r.remark,
+        'created_at': r.created_at.isoformat() if r.created_at else ''
+    } for r in stock_ins]
+    
+    stock_outs = StockOut.query.all()
+    tables['stock_outs'] = [{
+        'id': r.id, 'product_id': r.product_id, 'quantity': r.quantity,
+        'operator': r.operator, 'remark': r.remark,
+        'created_at': r.created_at.isoformat() if r.created_at else ''
+    } for r in stock_outs]
     
     checks = StockCheck.query.all()
     tables['stock_checks'] = [{
-        'id': c.id, 'project_id': c.project_id, 'checked_at': c.checked_at.isoformat() if c.checked_at else '',
-        'operator': c.operator, 'status': c.status, 'remark': c.remark,
+        'id': c.id, 'product_id': c.product_id,
+        'actual_stock': c.actual_stock, 'system_stock': c.system_stock,
+        'diff': c.diff, 'operator': c.operator, 'remark': c.remark,
         'created_at': c.created_at.isoformat() if c.created_at else ''
     } for c in checks]
-    
-    check_records = StockCheckRecord.query.all()
-    tables['stock_check_records'] = [{
-        'id': r.id, 'check_id': r.check_id, 'product_id': r.product_id,
-        'system_stock': r.system_stock, 'actual_stock': r.actual_stock,
-        'difference': r.difference, 'remark': r.remark
-    } for r in check_records]
     
     merges = ProductMerge.query.all()
     tables['product_merges'] = [{
